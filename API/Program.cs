@@ -1,5 +1,5 @@
-using Domain.Data;
 using Domain.Models;
+using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

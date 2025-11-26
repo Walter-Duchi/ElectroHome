@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using Domain.Models;
+﻿using Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace Domain.Data;
+namespace Infrastructure.Data;
 
 public partial class ReclamosContext : DbContext
 {
