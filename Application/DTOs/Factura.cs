@@ -6,10 +6,11 @@ namespace Application.DTOs
 {
     public record Factura
     {
-        public required string Marca;
-        public required string Modelo;
-        public required string NumSerie;
-        public required DateTime VentaUsuario;
-        public required int TiempoGarantia;
+        public required string Marca { get; init; }
+        public required string Modelo { get; init; }
+        public required string NumSerie { get; init; }
+        public required DateTime VentaUsuario { get; init; }
+        public required int TiempoGarantia { get; init; }
     }
+
 }

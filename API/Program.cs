@@ -1,5 +1,7 @@
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using API.Endpoints;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,9 @@ if(app.Environment.IsDevelopment())
 app.MapGet("/api/reclamos", async (ReclamosContext db) =>
     await db.Reclamos.ToListAsync()
 );
+
+app.MapVerFactura();
+
 //fin
 
 if (app.Environment.IsDevelopment())
