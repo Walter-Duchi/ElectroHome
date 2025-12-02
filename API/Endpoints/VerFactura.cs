@@ -12,7 +12,7 @@ namespace API.Endpoints
             {
                 var productos = await db.DetallesCompras
                     .Where(d => d.FkCompraNavigation.CodigoFactura == codigoFactura)
-                    .Select(d => new Factura
+                    .Select(d => new VerFacturaDto
                     {
                         Marca = d.FkNumeroSerieNavigation.FkProductoNavigation.FkMarcaNavigation.Nombre,
                         Modelo = d.FkNumeroSerieNavigation.FkProductoNavigation.Modelo,
@@ -28,7 +28,7 @@ namespace API.Endpoints
                 return Results.Ok(productos);
             })
             .WithName("GetFacturaByCodigo")
-            .Produces<List<Factura>>(StatusCodes.Status200OK)
+            .Produces<List<VerFacturaDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);   
         }
     }

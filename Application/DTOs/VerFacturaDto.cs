@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Application.DTOs
 {
-    public record Factura
+    public record VerFacturaDto
     {
         public required string Marca { get; init; }
         public required string Modelo { get; init; }

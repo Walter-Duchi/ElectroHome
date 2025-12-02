@@ -1,11 +1,13 @@
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using API.Endpoints;
+using Domain.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 //inicio
+builder.Services.AddScoped<IReclamoCodeGenerator, ReclamoCodeGenerator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
