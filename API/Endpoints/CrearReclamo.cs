@@ -56,9 +56,20 @@ namespace API.Endpoints
                 db.Reclamos.Add(nuevoReclamo);
                 await db.SaveChangesAsync();
 
-                return Results.Created($"reclamos/{nuevoReclamo.Id}", nuevoReclamo);
-            
-                
+                var response = new ReclamoResponseDto(
+                    nuevoReclamo.Id,
+                    nuevoReclamo.CodigoReclamo,
+                    nuevoReclamo.FechaVentaClienteFinal,
+                    nuevoReclamo.FechaReclamoClienteFinal,
+                    nuevoReclamo.Estado
+                );
+
+                return Results.Ok(new
+                {
+                    mensaje = $"Reclamo creado correctamente para el producto {dto.NumeroSerie}",
+                    reclamo = response
+                });
+
             })
             .WithName("PostCrearReclamo");
         }

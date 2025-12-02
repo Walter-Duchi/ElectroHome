@@ -35,6 +35,8 @@ app.MapGet("/api/reclamos", async (ReclamosContext db) =>
 
 app.MapVerFactura();
 
+app.MapCrearReclamo();
+
 //fin
 
 if (app.Environment.IsDevelopment())
