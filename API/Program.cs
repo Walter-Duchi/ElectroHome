@@ -37,6 +37,8 @@ app.MapVerFactura();
 
 app.MapCrearReclamo();
 
+app.MapAsignarTecnico();
+
 //fin
 
 if (app.Environment.IsDevelopment())
