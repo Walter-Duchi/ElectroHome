@@ -33,7 +33,7 @@ namespace Infrastructure.Repositories
             return await _context.UsuariosCertificacionMarcas
                 .Where(ucm => ucm.FkMarca == marcaId)
                 .Select(ucm => new TecnicoInfo {
-                    Id = ucm.FkMarca,
+                    Id = ucm.FkTecnico,
                     NombreCompleto = ucm.FkTecnicoNavigation.Nombres + " " + ucm.FkTecnicoNavigation.Apellidos
                 }).ToListAsync();
         }
