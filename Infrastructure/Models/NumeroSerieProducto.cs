@@ -13,7 +13,7 @@ public partial class NumeroSerieProducto
 
     public bool? Vendido { get; set; }
 
-    public virtual DetallesCompra? DetallesCompra { get; set; }
+    public virtual ComprasProducto? ComprasProducto { get; set; }
 
     public virtual Producto FkProductoNavigation { get; set; } = null!;
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Infrastructure.Models;
 
-public partial class DetallesCompra
+public partial class ComprasProducto
 {
     public int Id { get; set; }
 
@@ -17,5 +17,5 @@ public partial class DetallesCompra
 
     public virtual NumeroSerieProducto FkNumeroSerieNavigation { get; set; } = null!;
 
-    public virtual Reclamo? Reclamo { get; set; }
+    public virtual ReclamosProducto? ReclamosProducto { get; set; }
 }

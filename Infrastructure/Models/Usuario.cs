@@ -29,9 +29,9 @@ public partial class Usuario
 
     public virtual ICollection<Compra> Compras { get; set; } = new List<Compra>();
 
-    public virtual ICollection<Reclamo> ReclamoFkClienteFinalNavigations { get; set; } = new List<Reclamo>();
+    public virtual ICollection<Reclamo> Reclamos { get; set; } = new List<Reclamo>();
 
-    public virtual ICollection<Reclamo> ReclamoFkTecnicoAsignadoNavigations { get; set; } = new List<Reclamo>();
+    public virtual ICollection<ReclamosProducto> ReclamosProductos { get; set; } = new List<ReclamosProducto>();
 
     public virtual ICollection<UsuariosCertificacionMarca> UsuariosCertificacionMarcas { get; set; } = new List<UsuariosCertificacionMarca>();
 }

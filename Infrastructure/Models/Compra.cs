@@ -15,7 +15,7 @@ public partial class Compra
 
     public decimal TotalCompra { get; set; }
 
-    public virtual ICollection<DetallesCompra> DetallesCompras { get; set; } = new List<DetallesCompra>();
+    public virtual ICollection<ComprasProducto> ComprasProductos { get; set; } = new List<ComprasProducto>();
 
     public virtual Usuario FkClienteNavigation { get; set; } = null!;
 }

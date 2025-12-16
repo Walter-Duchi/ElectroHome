@@ -1,4 +1,4 @@
-using Infrastructure.Data;
+/*using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using API.Endpoints;
 using Domain.Services;
@@ -49,3 +49,4 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+*/
