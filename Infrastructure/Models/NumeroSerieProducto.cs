@@ -11,9 +11,15 @@ public partial class NumeroSerieProducto
 
     public string NumeroSerie { get; set; } = null!;
 
-    public bool? Vendido { get; set; }
+    public string? EstadoInventario { get; set; }
 
-    public virtual ComprasProducto? ComprasProducto { get; set; }
+    public virtual ComprobanteProductoReemplazado? ComprobanteProductoReemplazado { get; set; }
 
     public virtual Producto FkProductoNavigation { get; set; } = null!;
+
+    public virtual ICollection<MarcaLoEntregoComoReemplazo> MarcaLoEntregoComoReemplazos { get; set; } = new List<MarcaLoEntregoComoReemplazo>();
+
+    public virtual ReclamosProductoSn? ReclamosProductoSn { get; set; }
+
+    public virtual VentasPorNumeroSerieProducto? VentasPorNumeroSerieProducto { get; set; }
 }

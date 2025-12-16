@@ -9,11 +9,11 @@ public partial class Reclamo
 
     public string CodigoReclamo { get; set; } = null!;
 
-    public int EmpresaCliente { get; set; }
+    public int FkEmpresaCliente { get; set; }
 
     public DateTime? FechaCreacionReclamo { get; set; }
 
-    public virtual Usuario EmpresaClienteNavigation { get; set; } = null!;
+    public virtual Usuario FkEmpresaClienteNavigation { get; set; } = null!;
 
-    public virtual ReclamosProducto? ReclamosProducto { get; set; }
+    public virtual ICollection<ReclamosProductoSn> ReclamosProductoSns { get; set; } = new List<ReclamosProductoSn>();
 }

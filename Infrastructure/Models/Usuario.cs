@@ -23,15 +23,15 @@ public partial class Usuario
 
     public string Rol { get; set; } = null!;
 
-    public DateTime? FechaCreacion { get; set; }
+    public DateTime FechaCreacion { get; set; }
 
-    public string NumCuentaBancaria { get; set; } = null!;
-
-    public virtual ICollection<Compra> Compras { get; set; } = new List<Compra>();
+    public string? NumCuentaBancaria { get; set; }
 
     public virtual ICollection<Reclamo> Reclamos { get; set; } = new List<Reclamo>();
 
-    public virtual ICollection<ReclamosProducto> ReclamosProductos { get; set; } = new List<ReclamosProducto>();
+    public virtual ICollection<ReclamosProductoSn> ReclamosProductoSns { get; set; } = new List<ReclamosProductoSn>();
 
     public virtual ICollection<UsuariosCertificacionMarca> UsuariosCertificacionMarcas { get; set; } = new List<UsuariosCertificacionMarca>();
+
+    public virtual ICollection<Venta> Venta { get; set; } = new List<Venta>();
 }

@@ -11,6 +11,8 @@ public partial class Producto
 
     public string Modelo { get; set; } = null!;
 
+    public string Especificacion { get; set; } = null!;
+
     public int DiasGarantia { get; set; }
 
     public decimal Precio { get; set; }
