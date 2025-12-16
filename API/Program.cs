@@ -1,52 +1,75 @@
-/*using Infrastructure.Data;
+// Api/Program.cs
+using Application.DTOs.Auth;
+using Infrastructure.Data;
+using Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using API.Endpoints;
-using Domain.Services;
-
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//inicio
-builder.Services.AddScoped<IReclamoCodeGenerator, ReclamoCodeGenerator>();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// 1. Configurar Base de Datos
+builder.Services.AddDbContext<ReclamosContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddDbContext<ReclamosContext>(
-    opts => opts.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    )
-);
-//fin
+// 2. Configurar Autenticación JWT
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
 
-builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(key)
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// 3. Registrar servicios
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// 4. Configurar Minimal APIs
 var app = builder.Build();
 
-//inicio 
-if(app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.MapGet("/api/reclamos", async (ReclamosContext db) =>
-    await db.Reclamos.ToListAsync()
-);
-
-app.MapVerFactura();
-
-app.MapCrearReclamo();
-
-app.MapAsignarTecnico();
-
-//fin
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
+
+// 5. Endpoint de Login
+app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService) =>
+{
+    try
+    {
+        var response = await authService.AuthenticateAsync(request);
+        return Results.Ok(response);
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Results.Unauthorized();
+    }
+})
+.AllowAnonymous(); // Importante: este endpoint NO requiere autenticación
+
+// 6. Endpoint protegido de ejemplo
+app.MapGet("/api/usuarios/me", () =>
+{
+    // Este endpoint requiere autenticación
+    // Puedes acceder al usuario actual con HttpContext.User
+    return Results.Ok(new { message = "Autenticado correctamente" });
+})
+.RequireAuthorization(); // Esto protege el endpoint
+
 app.Run();
-*/
