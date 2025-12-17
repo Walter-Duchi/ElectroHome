@@ -42,11 +42,27 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// Agregar CORS después de builder.Services.AddAuthorization();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        builder =>
+        {
+            builder.WithOrigins("http://localhost:5173") // URL de tu frontend Vite
+                   .AllowAnyHeader()
+                   .AllowAnyMethod();
+        });
+});
+
 // 4. Configurar Minimal APIs
 var app = builder.Build();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// En el pipeline, después de app.UseAuthorization();
+app.UseCors("AllowReactApp");
+
 
 // 5. Endpoint de Login
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService) =>
@@ -61,7 +77,7 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authSer
         return Results.Unauthorized();
     }
 })
-.AllowAnonymous(); 
+.AllowAnonymous();
 
 
 

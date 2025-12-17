@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Infrastructure.Models;
+﻿using Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Data;

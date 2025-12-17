@@ -1,8 +1,6 @@
 ﻿using Application.DTOs.Auth;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 
