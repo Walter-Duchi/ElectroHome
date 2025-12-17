@@ -1,5 +1,5 @@
 // src/services/api.ts
-import axios from 'axios';
+import * as axios from 'axios';
 
 const API_URL = 'http://localhost:5298/api'; // Tu backend
 
