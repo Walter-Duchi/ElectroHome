@@ -1,5 +1,4 @@
-// src/services/api.ts
-import * as axios from 'axios';
+import axios from 'axios';
 
 const API_URL = 'http://localhost:5298/api'; // Tu backend
 
@@ -29,7 +28,7 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Token expirado o inv·lido
+            // Token expirado o inv√°lido
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/login';

@@ -1,4 +1,3 @@
-// src/types/auth.ts
 export interface LoginRequest {
     correo: string;
     contrasena: string;

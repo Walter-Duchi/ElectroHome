@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types/auth.ts","./services/api.ts","./services/authcontext.tsx","./services/authservice.ts","./components/login/loginform.tsx","./components/login/index.ts"],"version":"5.9.3"}

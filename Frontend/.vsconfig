@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProjectSchemaDefinitions xmlns="http://schemas.microsoft.com/vsconfig/2">
+  <Project>
+    <TypeScript>
+      <CompilerOptions>
+        <SkipDefaultLibCheck>true</SkipDefaultLibCheck>
+        <SkipLibCheck>true</SkipLibCheck>
+      </CompilerOptions>
+    </TypeScript>
+  </Project>
+</ProjectSchemaDefinitions>
