@@ -61,15 +61,8 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authSer
         return Results.Unauthorized();
     }
 })
-.AllowAnonymous(); // Importante: este endpoint NO requiere autenticación
+.AllowAnonymous(); 
 
-// 6. Endpoint protegido de ejemplo
-app.MapGet("/api/usuarios/me", () =>
-{
-    // Este endpoint requiere autenticación
-    // Puedes acceder al usuario actual con HttpContext.User
-    return Results.Ok(new { message = "Autenticado correctamente" });
-})
-.RequireAuthorization(); // Esto protege el endpoint
+
 
 app.Run();
