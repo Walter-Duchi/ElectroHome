@@ -7,11 +7,11 @@ interface AuthContextType {
   login: (correo: string, contrasena: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  userRole: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -31,14 +31,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: false,
   });
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
-  // SOLUCIÓN: Usar un efecto con cleanup y prevenir renders en cascada
   useEffect(() => {
-    // Variable para trackear si el componente está montado
     let isMounted = true;
 
     const initializeAuth = async () => {
-      // Pequeño delay para asegurar que React esté listo
       await new Promise(resolve => setTimeout(resolve, 0));
 
       if (!isMounted) return;
@@ -48,19 +46,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (token && userStr) {
         try {
-          // SOLUCIÓN: Usar una función de actualización
-          setAuth(prevAuth => {
-            // Solo actualizar si realmente hay cambios
-            if (prevAuth.isAuthenticated && prevAuth.token === token) {
-              return prevAuth;
-            }
-
-            return {
-              user: JSON.parse(userStr),
-              token,
-              isAuthenticated: true,
-            };
+          const user = JSON.parse(userStr);
+          setAuth({
+            user: user,
+            token,
+            isAuthenticated: true,
           });
+          setUserRole(user.rol);
         } catch (error) {
           console.error('Error parsing user data:', error);
           localStorage.removeItem('token');
@@ -75,17 +67,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
 
-    // Cleanup function
     return () => {
       isMounted = false;
     };
-  }, []); // Empty dependency array - solo se ejecuta al montar
+  }, []);
 
   const login = async (correo: string, contrasena: string): Promise<void> => {
     try {
       const response = await authService.login({ correo, contrasena });
 
-      // Actualizar estado de manera segura
       setAuth({
         user: {
           id: response.id,
@@ -95,6 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         token: response.token,
         isAuthenticated: true,
       });
+      setUserRole(response.rol);
     } catch (error: unknown) {
       if (error instanceof Error) {
         throw error;
@@ -110,10 +101,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       token: null,
       isAuthenticated: false,
     });
+    setUserRole(null);
   };
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout, loading }}>
+    <AuthContext.Provider value={{ auth, login, logout, loading, userRole }}>
       {children}
     </AuthContext.Provider>
   );
