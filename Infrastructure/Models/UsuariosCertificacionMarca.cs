@@ -1,4 +1,7 @@
-﻿namespace Infrastructure.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace Infrastructure.Models;
 
 public partial class UsuariosCertificacionMarca
 {

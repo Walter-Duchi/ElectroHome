@@ -11,7 +11,6 @@ interface CreateUserModalProps {
 const CreateUserModal: React.FC<CreateUserModalProps> = ({
     allowedRoles,
     onClose,
-    currentUserRole
 }) => {
     const [formData, setFormData] = useState({
         nombres: '',
