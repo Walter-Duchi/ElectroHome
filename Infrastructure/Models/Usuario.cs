@@ -33,6 +33,8 @@ public partial class Usuario
 
     public virtual ICollection<ReclamosProductoSn> ReclamosProductoSns { get; set; } = new List<ReclamosProductoSn>();
 
+    public virtual ICollection<TokensDeAcceso> TokensDeAccesos { get; set; } = new List<TokensDeAcceso>();
+
     public virtual ICollection<UsuariosCertificacionMarca> UsuariosCertificacionMarcas { get; set; } = new List<UsuariosCertificacionMarca>();
 
     public virtual ICollection<Venta> Venta { get; set; } = new List<Venta>();
