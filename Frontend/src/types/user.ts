@@ -8,6 +8,7 @@ export interface CreateUserRequest {
     ruc: string;
     rol: string;
     numCuentaBancaria?: string;
+    tipoCuentaBancaria?: string;  // Nuevo campo
 }
 
 export interface CreateUserResponse {

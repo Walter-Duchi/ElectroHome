@@ -10,12 +10,12 @@ namespace Infrastructure.Services
     public class UserService : IUserService
     {
         private readonly ReclamosContext _context;
-        private readonly IBankCardValidator _cardValidator;
+        private readonly IBankAccountValidator _accountValidator;
 
-        public UserService(ReclamosContext context, IBankCardValidator cardValidator)
+        public UserService(ReclamosContext context, IBankAccountValidator accountValidator)
         {
             _context = context;
-            _cardValidator = cardValidator;
+            _accountValidator = accountValidator;
         }
 
         public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, string currentUserRole)
@@ -32,17 +32,26 @@ namespace Infrastructure.Services
             if (!IsValidRol(request.Rol))
                 throw new ArgumentException($"Rol inválido: {request.Rol}");
 
+            // Validación para clientes
             if (request.Rol == "Cliente")
             {
                 if (string.IsNullOrWhiteSpace(request.NumCuentaBancaria))
                     throw new ArgumentException("El número de cuenta bancaria es obligatorio para clientes");
 
-                if (!_cardValidator.ValidateCardNumber(request.NumCuentaBancaria))
+                if (!_accountValidator.ValidateBankAccount(request.NumCuentaBancaria))
                     throw new ArgumentException("El número de cuenta bancaria no es válido");
+
+                if (string.IsNullOrWhiteSpace(request.TipoCuentaBancaria))
+                    throw new ArgumentException("El tipo de cuenta bancaria es obligatorio para clientes");
+
+                if (!_accountValidator.ValidateAccountType(request.TipoCuentaBancaria))
+                    throw new ArgumentException("El tipo de cuenta bancaria debe ser 'Ahorro' o 'Corriente'");
             }
             else
             {
+                // Para otros roles, no se guarda información bancaria
                 request.NumCuentaBancaria = null;
+                request.TipoCuentaBancaria = null;
             }
 
             var usuario = new Usuario
@@ -56,7 +65,8 @@ namespace Infrastructure.Services
                 Ruc = request.RUC,
                 Rol = request.Rol,
                 FechaCreacion = DateTime.UtcNow,
-                NumCuentaBancaria = request.NumCuentaBancaria
+                NumCuentaBancaria = request.NumCuentaBancaria,
+                TipoCuentaBancaria = request.TipoCuentaBancaria
             };
 
             _context.Usuarios.Add(usuario);
@@ -105,7 +115,7 @@ namespace Infrastructure.Services
 
         Task<bool> IUserService.CanCreateRole(string creatorRole, string targetRole)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(CanCreateRole(creatorRole, targetRole));
         }
     }
 }

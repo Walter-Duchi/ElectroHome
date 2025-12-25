@@ -24,50 +24,22 @@ export const userService = {
         }
     },
 
-    validateCardNumber(cardNumber: string): boolean {
-        const cleaned = cardNumber.replace(/\D/g, '');
+    validateBankAccount(accountNumber: string): boolean {
+        if (!accountNumber) return false;
 
-        if (cleaned.length < 13 || cleaned.length > 19) {
+        // Limpiar el número de cuenta
+        const cleaned = accountNumber.replace(/\D/g, '');
+
+        // Validar longitud (10-20 dígitos para cuentas bancarias)
+        if (cleaned.length < 10 || cleaned.length > 20) {
             return false;
         }
 
-        let sum = 0;
-        let shouldDouble = false;
-
-        for (let i = cleaned.length - 1; i >= 0; i--) {
-            let digit = parseInt(cleaned.charAt(i), 10);
-
-            if (shouldDouble) {
-                digit *= 2;
-                if (digit > 9) {
-                    digit -= 9;
-                }
-            }
-
-            sum += digit;
-            shouldDouble = !shouldDouble;
-        }
-
-        return sum % 10 === 0;
+        // Validar que solo contenga dígitos
+        return /^\d+$/.test(cleaned);
     },
 
-    getCardType(cardNumber: string): string {
-        const cleaned = cardNumber.replace(/\D/g, '');
-
-        if (/^4/.test(cleaned)) {
-            return 'Visa';
-        } else if (/^5[1-5]/.test(cleaned)) {
-            return 'Mastercard';
-        } else if (/^3[47]/.test(cleaned)) {
-            return 'American Express';
-        } else if (/^3(?:0[0-5]|[68])/.test(cleaned)) {
-            return 'Diners Club';
-        } else if (/^6(?:011|5)/.test(cleaned)) {
-            return 'Discover';
-        } else if (/^(?:2131|1800|35)/.test(cleaned)) {
-            return 'JCB';
-        }
-
-        return 'Desconocida';
+    validateAccountType(accountType: string): boolean {
+        return accountType === 'Ahorro' || accountType === 'Corriente';
     }
 };
