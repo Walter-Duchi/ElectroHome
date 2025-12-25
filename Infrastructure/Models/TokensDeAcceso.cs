@@ -13,6 +13,10 @@ public partial class TokensDeAcceso
 
     public DateTime FechaExpiracion { get; set; }
 
+    public bool Vigente { get; set; }
+
+    public string? TipoToken { get; set; }
+
     public int FkUsuario { get; set; }
 
     public virtual Usuario FkUsuarioNavigation { get; set; } = null!;
