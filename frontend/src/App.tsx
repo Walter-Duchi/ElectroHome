@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../services/authContext';
 import LoginForm from '../components/Login/LoginForm';
+import ForgotPasswordForm from '../components/Login/ForgotPasswordForm';
+import ResetPasswordForm from '../components/Login/ResetPasswordForm';
 import Navbar from '../components/Navbar/Navbar';
 import Dashboard from '../components/Dashboard/Dashboard';
 import './App.css';
@@ -33,6 +35,12 @@ const AppContent: React.FC = () => {
       <Routes>
         <Route path="/login" element={
           auth.isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />
+        } />
+        <Route path="/forgot-password" element={
+          auth.isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordForm />
+        } />
+        <Route path="/reset-password" element={
+          auth.isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordForm />
         } />
         <Route path="/" element={
           <ProtectedRoute>

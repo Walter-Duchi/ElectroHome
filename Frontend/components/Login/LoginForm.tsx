@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as React from 'react';
 import { useAuth } from '../../services/authContext';
 import './LoginForm.css';
+import { Link } from 'react-router-dom';
 
 const LoginForm: React.FC = () => {
     const [correo, setCorreo] = useState('');
@@ -90,6 +91,15 @@ const LoginForm: React.FC = () => {
                             'Iniciar Sesión'
                         )}
                     </button>
+
+                    <div className="login-info">
+                      <p className="info-text">
+                      <Link to="/forgot-password" style={{ color: '#667eea', textDecoration: 'none' }}>
+                        ¿Olvidaste tu contraseña?
+                      </Link>
+                      </p>
+                    </div>
+
                 </form>
 
                 <div className="login-info">

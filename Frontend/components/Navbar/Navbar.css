@@ -1,13 +1,10 @@
 .navbar {
     background: white;
+    padding: 15px 40px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    padding: 15px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
 }
 
 .navbar-left {
@@ -55,23 +52,21 @@
 
     .create-button:hover:not(:disabled) {
         background: #218838;
-        transform: translateY(-2px);
-    }
-
-    .create-button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
     }
 
 .logout-button {
-    background: #dc3545;
+    background: #e74c3c;
     color: white;
 }
 
-    .logout-button:hover {
-        background: #c82333;
-        transform: translateY(-2px);
+    .logout-button:hover:not(:disabled) {
+        background: #c0392b;
     }
+
+.navbar-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 
 .user-info {
     display: flex;
@@ -81,5 +76,5 @@
 
 .user-email {
     color: #555;
-    font-size: 14px;
+    font-weight: 500;
 }

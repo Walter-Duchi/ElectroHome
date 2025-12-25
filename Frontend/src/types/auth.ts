@@ -21,3 +21,18 @@ export interface AuthState {
     token: string | null;
     isAuthenticated: boolean;
 }
+
+export interface ForgotPasswordRequest {
+    correo: string;
+}
+
+export interface ResetPasswordRequest {
+    token: string;
+    nuevaContrasena: string;
+    confirmarContrasena: string;
+}
+
+export interface ValidateTokenResponse {
+    valid: boolean;
+    message: string;
+}
