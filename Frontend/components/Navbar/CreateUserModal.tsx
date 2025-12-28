@@ -1,6 +1,34 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  MenuItem,
+  Grid,
+  Alert,
+  CircularProgress,
+  Typography,
+  Box,
+  Stepper,
+  Step,
+  StepLabel,
+  InputAdornment,
+  IconButton,
+} from '@mui/material';
+import {
+  Person,
+  Email,
+  Phone,
+  VpnKey,
+  Business,
+  AccountBalance,
+  Visibility,
+  VisibilityOff,
+} from '@mui/icons-material';
 import { userService } from '../../services/userService';
-import './CreateUserModal.css';
 
 interface CreateUserModalProps {
   allowedRoles: string[];
@@ -8,10 +36,10 @@ interface CreateUserModalProps {
   currentUserRole: string;
 }
 
-const CreateUserModal: React.FC<CreateUserModalProps> = ({
-  allowedRoles,
-  onClose,
-}) => {
+const steps = ['Información Personal', 'Datos de Contacto', 'Información Bancaria'];
+
+const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose }) => {
+  const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     nombres: '',
     apellidos: '',
@@ -23,272 +51,423 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
     ruc: '',
     rol: allowedRoles[0] || '',
     numCuentaBancaria: '',
-    tipoCuentaBancaria: ''
+    tipoCuentaBancaria: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (formData.rol !== 'Cliente') {
       setFormData(prev => ({
         ...prev,
         numCuentaBancaria: '',
-        tipoCuentaBancaria: ''
+        tipoCuentaBancaria: '',
       }));
     }
   }, [formData.rol]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+  const handleNext = () => {
+    if (validateStep(activeStep)) {
+      setActiveStep((prevStep) => prevStep + 1);
     }
   };
 
-  const validateForm = (): boolean => {
+  const handleBack = () => {
+    setActiveStep((prevStep) => prevStep - 1);
+  };
+
+  const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.nombres.trim()) newErrors.nombres = 'Nombres son requeridos';
-    if (!formData.apellidos.trim()) newErrors.apellidos = 'Apellidos son requeridos';
-    if (!formData.correo.trim()) newErrors.correo = 'Correo es requerido';
-    if (!/\S+@\S+\.\S+/.test(formData.correo)) newErrors.correo = 'Correo no válido';
-    if (formData.contrasena.length < 6) newErrors.contrasena = 'La contraseña debe tener al menos 6 caracteres';
-    if (formData.contrasena !== formData.confirmarContrasena) newErrors.confirmarContrasena = 'Las contraseñas no coinciden';
-    if (!formData.celular.trim()) newErrors.celular = 'Celular es requerido';
-    if (!formData.ruc.trim()) newErrors.ruc = 'RUC es requerido';
-    if (formData.ruc.length !== 13) newErrors.ruc = 'RUC debe tener 13 dígitos';
-    if (!formData.rol) newErrors.rol = 'Rol es requerido';
+    switch (step) {
+      case 0: // Información Personal
+        if (!formData.nombres.trim()) newErrors.nombres = 'Nombres son requeridos';
+        if (!formData.apellidos.trim()) newErrors.apellidos = 'Apellidos son requeridos';
+        if (!formData.correo.trim()) newErrors.correo = 'Correo es requerido';
+        if (!/\S+@\S+\.\S+/.test(formData.correo)) newErrors.correo = 'Correo no válido';
+        if (formData.contrasena.length < 8)
+          newErrors.contrasena = 'La contraseña debe tener al menos 8 caracteres';
+        if (formData.contrasena !== formData.confirmarContrasena)
+          newErrors.confirmarContrasena = 'Las contraseñas no coinciden';
+        break;
+      case 1: // Datos de Contacto
+        if (!formData.celular.trim()) newErrors.celular = 'Celular es requerido';
+        if (!formData.ruc.trim()) newErrors.ruc = 'RUC es requerido';
+        if (formData.ruc.length !== 13) newErrors.ruc = 'RUC debe tener 13 dígitos';
+        if (!formData.rol) newErrors.rol = 'Rol es requerido';
+        break;
+      case 2: // Información Bancaria
+        if (formData.rol === 'Cliente') {
+          if (!formData.numCuentaBancaria?.trim()) {
+            newErrors.numCuentaBancaria = 'Número de cuenta bancaria es obligatorio para clientes';
+          } else if (!userService.validateBankAccount(formData.numCuentaBancaria)) {
+            newErrors.numCuentaBancaria =
+              'Número de cuenta bancaria inválido (debe tener 10-20 dígitos)';
+          }
 
-    if (formData.rol === 'Cliente') {
-      if (!formData.numCuentaBancaria?.trim()) {
-        newErrors.numCuentaBancaria = 'Número de cuenta bancaria es obligatorio para clientes';
-      } else if (!userService.validateBankAccount(formData.numCuentaBancaria)) {
-        newErrors.numCuentaBancaria = 'Número de cuenta bancaria inválido (debe tener 10-20 dígitos)';
-      }
-
-      if (!formData.tipoCuentaBancaria) {
-        newErrors.tipoCuentaBancaria = 'Tipo de cuenta bancaria es obligatorio para clientes';
-      } else if (!userService.validateAccountType(formData.tipoCuentaBancaria)) {
-        newErrors.tipoCuentaBancaria = 'Tipo de cuenta debe ser Ahorro o Corriente';
-      }
+          if (!formData.tipoCuentaBancaria) {
+            newErrors.tipoCuentaBancaria = 'Tipo de cuenta bancaria es obligatorio para clientes';
+          } else if (!userService.validateAccountType(formData.tipoCuentaBancaria)) {
+            newErrors.tipoCuentaBancaria = 'Tipo de cuenta debe ser Ahorro o Corriente';
+          }
+        }
+        break;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const userData = {
-        nombres: formData.nombres,
-        apellidos: formData.apellidos,
-        correo: formData.correo,
-        contrasena: formData.contrasena,
-        celular: formData.celular,
-        convencional: formData.convencional || undefined,
-        ruc: formData.ruc,
-        rol: formData.rol,
-        numCuentaBancaria: formData.rol === 'Cliente' ? formData.numCuentaBancaria : undefined,
-        tipoCuentaBancaria: formData.rol === 'Cliente' ? formData.tipoCuentaBancaria : undefined
-      };
-
-      const response = await userService.createUser(userData);
-
-      alert(`Usuario ${response.nombres} creado exitosamente!`);
-      onClose();
-
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
   };
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <div className="modal-header">
-          <h2>Crear Nuevo Usuario</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Nombres *</label>
-              <input
-                type="text"
+    if (!validateStep(activeStep) && activeStep < steps.length - 1) {
+      return;
+    }
+
+    if (activeStep === steps.length - 1) {
+      setLoading(true);
+      setSubmitError('');
+
+      try {
+        const userData = {
+          nombres: formData.nombres,
+          apellidos: formData.apellidos,
+          correo: formData.correo,
+          contrasena: formData.contrasena,
+          celular: formData.celular,
+          convencional: formData.convencional || undefined,
+          ruc: formData.ruc,
+          rol: formData.rol,
+          numCuentaBancaria:
+            formData.rol === 'Cliente' ? formData.numCuentaBancaria : undefined,
+          tipoCuentaBancaria:
+            formData.rol === 'Cliente' ? formData.tipoCuentaBancaria : undefined,
+        };
+
+        const response = await userService.createUser(userData);
+
+        alert(`Usuario ${response.nombres} creado exitosamente!`);
+        onClose();
+      } catch (error: any) {
+        setSubmitError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      handleNext();
+    }
+  };
+
+  const handleTogglePassword = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const getStepContent = (step: number) => {
+    switch (step) {
+      case 0:
+        return (
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Nombres *"
                 name="nombres"
                 value={formData.nombres}
                 onChange={handleInputChange}
+                error={!!errors.nombres}
+                helperText={errors.nombres}
                 disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
-              {errors.nombres && <span className="error">{errors.nombres}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Apellidos *</label>
-              <input
-                type="text"
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Apellidos *"
                 name="apellidos"
                 value={formData.apellidos}
                 onChange={handleInputChange}
+                error={!!errors.apellidos}
+                helperText={errors.apellidos}
                 disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
-              {errors.apellidos && <span className="error">{errors.apellidos}</span>}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Correo Electrónico *</label>
-            <input
-              type="email"
-              name="correo"
-              value={formData.correo}
-              onChange={handleInputChange}
-              disabled={loading}
-            />
-            {errors.correo && <span className="error">{errors.correo}</span>}
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Contraseña *</label>
-              <input
-                type="password"
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                label="Correo Electrónico *"
+                name="correo"
+                type="email"
+                value={formData.correo}
+                onChange={handleInputChange}
+                error={!!errors.correo}
+                helperText={errors.correo}
+                disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Contraseña *"
                 name="contrasena"
+                type={showPassword ? 'text' : 'password'}
                 value={formData.contrasena}
                 onChange={handleInputChange}
+                error={!!errors.contrasena}
+                helperText={errors.contrasena}
                 disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <VpnKey color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={handleTogglePassword} edge="end">
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
-              {errors.contrasena && <span className="error">{errors.contrasena}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Confirmar Contraseña *</label>
-              <input
-                type="password"
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Confirmar Contraseña *"
                 name="confirmarContrasena"
+                type={showPassword ? 'text' : 'password'}
                 value={formData.confirmarContrasena}
                 onChange={handleInputChange}
+                error={!!errors.confirmarContrasena}
+                helperText={errors.confirmarContrasena}
                 disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <VpnKey color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
-              {errors.confirmarContrasena && <span className="error">{errors.confirmarContrasena}</span>}
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Celular *</label>
-              <input
-                type="tel"
+            </Grid>
+          </Grid>
+        );
+      case 1:
+        return (
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Celular *"
                 name="celular"
                 value={formData.celular}
                 onChange={handleInputChange}
+                error={!!errors.celular}
+                helperText={errors.celular}
                 disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Phone color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
-              {errors.celular && <span className="error">{errors.celular}</span>}
-            </div>
-
-            <div className="form-group">
-              <label>Convencional (Opcional)</label>
-              <input
-                type="tel"
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Convencional (Opcional)"
                 name="convencional"
                 value={formData.convencional}
                 onChange={handleInputChange}
                 disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Phone color="action" />
+                    </InputAdornment>
+                  ),
+                }}
               />
-            </div>
-          </div>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                label="RUC *"
+                name="ruc"
+                value={formData.ruc}
+                onChange={handleInputChange}
+                inputProps={{ maxLength: 13 }}
+                error={!!errors.ruc}
+                helperText={errors.ruc}
+                disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Business color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label="Rol *"
+                name="rol"
+                value={formData.rol}
+                onChange={handleInputChange}
+                error={!!errors.rol}
+                helperText={errors.rol}
+                disabled={loading}
+              >
+                {allowedRoles.map((role) => (
+                  <MenuItem key={role} value={role}>
+                    {role}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          </Grid>
+        );
+      case 2:
+        return formData.rol === 'Cliente' ? (
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                label="Número de Cuenta Bancaria *"
+                name="numCuentaBancaria"
+                value={formData.numCuentaBancaria}
+                onChange={handleInputChange}
+                placeholder="Ej: 12345678901234567890"
+                error={!!errors.numCuentaBancaria}
+                helperText={errors.numCuentaBancaria}
+                disabled={loading}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AccountBalance color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Número de cuenta bancaria (10-20 dígitos)
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label="Tipo de Cuenta Bancaria *"
+                name="tipoCuentaBancaria"
+                value={formData.tipoCuentaBancaria}
+                onChange={handleInputChange}
+                error={!!errors.tipoCuentaBancaria}
+                helperText={errors.tipoCuentaBancaria}
+                disabled={loading}
+              >
+                <MenuItem value="">Seleccione...</MenuItem>
+                <MenuItem value="Ahorro">Ahorro</MenuItem>
+                <MenuItem value="Corriente">Corriente</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <AccountBalance sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+            <Typography variant="body1" color="text.secondary">
+              Información bancaria no requerida para el rol de {formData.rol}
+            </Typography>
+          </Box>
+        );
+      default:
+        return null;
+    }
+  };
 
-          <div className="form-group">
-            <label>RUC *</label>
-            <input
-              type="text"
-              name="ruc"
-              value={formData.ruc}
-              onChange={handleInputChange}
-              maxLength={13}
-              disabled={loading}
-            />
-            {errors.ruc && <span className="error">{errors.ruc}</span>}
-          </div>
+  return (
+    <Dialog open={true} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Typography variant="h6" fontWeight={600}>
+          Crear Nuevo Usuario
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Complete la información requerida en cada paso
+        </Typography>
+      </DialogTitle>
+      
+      <Box sx={{ px: 3, pt: 2 }}>
+        <Stepper activeStep={activeStep} alternativeLabel>
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Box>
 
-          <div className="form-group">
-            <label>Rol *</label>
-            <select
-              name="rol"
-              value={formData.rol}
-              onChange={handleInputChange}
-              disabled={loading}
-            >
-              {allowedRoles.map(role => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-            {errors.rol && <span className="error">{errors.rol}</span>}
-          </div>
-
-          {formData.rol === 'Cliente' && (
-            <>
-              <div className="form-group">
-                <label>Número de Cuenta Bancaria *</label>
-                <input
-                  type="text"
-                  name="numCuentaBancaria"
-                  value={formData.numCuentaBancaria}
-                  onChange={handleInputChange}
-                  placeholder="Ej: 12345678901234567890"
-                  disabled={loading}
-                />
-                {errors.numCuentaBancaria && <span className="error">{errors.numCuentaBancaria}</span>}
-                <div className="card-hint">
-                  Número de cuenta bancaria (10-20 dígitos)
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Tipo de Cuenta Bancaria *</label>
-                <select
-                  name="tipoCuentaBancaria"
-                  value={formData.tipoCuentaBancaria}
-                  onChange={handleInputChange}
-                  disabled={loading}
-                >
-                  <option value="">Seleccione...</option>
-                  <option value="Ahorro">Ahorro</option>
-                  <option value="Corriente">Corriente</option>
-                </select>
-                {errors.tipoCuentaBancaria && <span className="error">{errors.tipoCuentaBancaria}</span>}
-              </div>
-            </>
+      <form onSubmit={handleSubmit}>
+        <DialogContent>
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+              {submitError}
+            </Alert>
           )}
-
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Creando...' : 'Crear Usuario'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          
+          {getStepContent(activeStep)}
+        </DialogContent>
+        
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={activeStep === 0 ? onClose : handleBack}
+            disabled={loading}
+          >
+            {activeStep === 0 ? 'Cancelar' : 'Atrás'}
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? (
+              <CircularProgress size={24} />
+            ) : activeStep === steps.length - 1 ? (
+              'Crear Usuario'
+            ) : (
+              'Siguiente'
+            )}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 };
 
