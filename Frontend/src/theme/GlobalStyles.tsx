@@ -3,28 +3,65 @@ import { GlobalStyles as MuiGlobalStyles } from '@mui/material';
 export const GlobalStyles = () => (
   <MuiGlobalStyles
     styles={{
-      '*': {
-        margin: 0,
-        padding: 0,
-        boxSizing: 'border-box',
-      },
-      'html, body': {
-        width: '100%',
+      // Normalización adicional para consistencia total
+      'html, body, #root': {
         height: '100%',
-        WebkitFontSmoothing: 'antialiased',
-        MozOsxFontSmoothing: 'grayscale',
-      },
-      '#root': {
         width: '100%',
-        minHeight: '100vh',
       },
+      // Estilos para inputs de tipo number consistentes
+      'input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button': {
+        WebkitAppearance: 'none',
+        margin: 0,
+      },
+      'input[type=number]': {
+        MozAppearance: 'textfield',
+      },
+      // Estilos para selección de texto consistente
+      '::selection': {
+        backgroundColor: 'rgba(0, 86, 179, 0.2)',
+        color: '#212529',
+      },
+      '::-moz-selection': {
+        backgroundColor: 'rgba(0, 86, 179, 0.2)',
+        color: '#212529',
+      },
+      // Animaciones globales
       '@keyframes fadeIn': {
         from: { opacity: 0 },
         to: { opacity: 1 },
       },
-      '@keyframes slideIn': {
+      '@keyframes fadeOut': {
+        from: { opacity: 1 },
+        to: { opacity: 0 },
+      },
+      '@keyframes slideInUp': {
         from: { transform: 'translateY(20px)', opacity: 0 },
         to: { transform: 'translateY(0)', opacity: 1 },
+      },
+      '@keyframes slideInDown': {
+        from: { transform: 'translateY(-20px)', opacity: 0 },
+        to: { transform: 'translateY(0)', opacity: 1 },
+      },
+      '@keyframes pulse': {
+        '0%': { transform: 'scale(1)' },
+        '50%': { transform: 'scale(1.05)' },
+        '100%': { transform: 'scale(1)' },
+      },
+      // Estilos para focus accesible
+      '*:focus-visible': {
+        outline: '2px solid #0056b3',
+        outlineOffset: '2px',
+        borderRadius: '4px',
+      },
+      // Estilos para impresión
+      '@media print': {
+        body: {
+          backgroundColor: '#fff !important',
+          color: '#000 !important',
+        },
+        'nav, footer, .no-print': {
+          display: 'none !important',
+        },
       },
     }}
   />
