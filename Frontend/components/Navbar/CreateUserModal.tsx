@@ -180,7 +180,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
       case 0:
         return (
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <TextField
                 label="Nombres *"
                 name="nombres"
@@ -198,7 +198,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <TextField
                 label="Apellidos *"
                 name="apellidos"
@@ -216,7 +216,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{xs:12}}>
               <TextField
                 label="Correo Electrónico *"
                 name="correo"
@@ -235,7 +235,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <TextField
                 label="Contraseña *"
                 name="contrasena"
@@ -261,7 +261,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <TextField
                 label="Confirmar Contraseña *"
                 name="confirmarContrasena"
@@ -285,7 +285,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
       case 1:
         return (
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <TextField
                 label="Celular *"
                 name="celular"
@@ -303,7 +303,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <TextField
                 label="Convencional (Opcional)"
                 name="convencional"
@@ -319,7 +319,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{xs:12}}>
               <TextField
                 label="RUC *"
                 name="ruc"
@@ -338,7 +338,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{xs:12}}>
               <TextField
                 select
                 label="Rol *"
@@ -361,7 +361,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
       case 2:
         return formData.rol === 'Cliente' ? (
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid size={{xs:12}}>
               <TextField
                 label="Número de Cuenta Bancaria *"
                 name="numCuentaBancaria"
@@ -383,7 +383,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
                 Número de cuenta bancaria (10-20 dígitos)
               </Typography>
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{xs:12}}>
               <TextField
                 select
                 label="Tipo de Cuenta Bancaria *"

@@ -186,7 +186,7 @@ const LoginForm: React.FC = () => {
           </Divider>
 
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <Box
                 sx={{
                   p: 2,
@@ -208,7 +208,7 @@ const LoginForm: React.FC = () => {
               </Box>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <Box
                 sx={{
                   p: 2,
@@ -230,7 +230,7 @@ const LoginForm: React.FC = () => {
               </Box>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <Box
                 sx={{
                   p: 2,
@@ -252,7 +252,7 @@ const LoginForm: React.FC = () => {
               </Box>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid size={{xs:12, sm: 6}}>
               <Box
                 sx={{
                   p: 2,

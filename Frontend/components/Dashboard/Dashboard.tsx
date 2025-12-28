@@ -129,7 +129,7 @@ const Dashboard: React.FC = () => {
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={8}>
+            <Grid size={{xs:12, md: 8}}>
               <Stack direction="row" spacing={2} alignItems="center" mb={2}>
                 <Typography variant="h5" fontWeight={600}>
                   {auth.user?.correo}
@@ -146,7 +146,7 @@ const Dashboard: React.FC = () => {
               </Typography>
               
               <Grid container spacing={2}>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{xs:6, sm: 3}}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">
                       ID de Usuario
@@ -154,7 +154,7 @@ const Dashboard: React.FC = () => {
                     <Typography variant="h6">{auth.user?.id}</Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{xs:6, sm: 3}}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">
                       Eficiencia
@@ -162,7 +162,7 @@ const Dashboard: React.FC = () => {
                     <Typography variant="h6">{stats.efficiency}%</Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{xs:6, sm: 3}}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">
                       Tareas Completadas
@@ -170,7 +170,7 @@ const Dashboard: React.FC = () => {
                     <Typography variant="h6">{stats.completed}/{stats.tasks}</Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{xs:6, sm: 3}}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">
                       Estado
@@ -181,7 +181,7 @@ const Dashboard: React.FC = () => {
               </Grid>
             </Grid>
             
-            <Grid item xs={12} md={4}>
+            <Grid size={{xs:12, md: 4}}>
               <Box sx={{ textAlign: 'center' }}>
                 <Box sx={{ position: 'relative', display: 'inline-flex' }}>
                   <Box
@@ -211,7 +211,7 @@ const Dashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{xs:12, sm: 6, md:3}}>
           <Card>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={2}>
@@ -241,7 +241,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{xs:12, sm: 6, md:3}}>
           <Card>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={2}>
@@ -272,7 +272,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{xs:12, sm: 6, md:3}}>
           <Card>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={2}>
@@ -303,7 +303,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid size={{xs:12, sm: 6, md:3}}>
           <Card>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={2}>
@@ -337,7 +337,7 @@ const Dashboard: React.FC = () => {
 
       {/* Permisos y Funcionalidades */}
       <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
+        <Grid size={{xs:12, md: 8}}>
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -376,7 +376,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </Grid>
         
-        <Grid item xs={12} md={4}>
+        <Grid size={{xs:12, md: 4}}>
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight={600} gutterBottom>

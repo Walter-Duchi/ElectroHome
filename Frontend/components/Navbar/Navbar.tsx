@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../services/authContext';
 import { userService } from '../../services/userService';
 import CreateUserModal from './CreateUserModal';
-import './Navbar.css';
 
 const Navbar: React.FC = () => {
   const { auth, logout, userRole } = useAuth();
