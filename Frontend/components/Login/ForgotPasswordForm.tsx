@@ -1,5 +1,18 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Paper,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  CircularProgress,
+  Link,
+  InputAdornment,
+} from '@mui/material';
+import { Email as EmailIcon, ArrowBack } from '@mui/icons-material';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 const ForgotPasswordForm: React.FC = () => {
   const [correo, setCorreo] = useState('');
@@ -52,107 +65,130 @@ const ForgotPasswordForm: React.FC = () => {
   };
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h2 className="login-title">Restablecer Contraseña</h2>
-        <p className="login-subtitle">
-          Ingresa tu correo electrónico registrado y te enviaremos un enlace para crear una nueva contraseña.
-        </p>
+    <Container maxWidth="sm">
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          py: 4,
+          background: 'linear-gradient(135deg, #0056b3 0%, #003b82 100%)',
+        }}
+      >
+        <Paper
+          elevation={24}
+          sx={{
+            p: { xs: 3, md: 4 },
+            width: '100%',
+            maxWidth: 450,
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+              Restablecer Contraseña
+            </Typography>
+            <Typography variant="subtitle1" color="text.secondary">
+              Ingresa tu correo electrónico registrado y te enviaremos un enlace para crear una nueva contraseña.
+            </Typography>
+          </Box>
 
-        {error && (
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error}
-          </div>
-        )}
+          {error && (
+            <Alert
+              severity="error"
+              sx={{ mb: 3, borderRadius: 2 }}
+              onClose={() => setError('')}
+            >
+              {error}
+            </Alert>
+          )}
 
-        {message && (
-          <div className="success-message" style={{
-            backgroundColor: '#d4edda',
-            border: '1px solid #c3e6cb',
-            color: '#155724',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span style={{ fontSize: '18px' }}>✅</span>
-            <div>
-              <strong>¡Solicitud procesada!</strong>
-              <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>{message}</p>
-              <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#0c5460' }}>
+          {message && (
+            <Alert
+              severity="success"
+              sx={{ mb: 3, borderRadius: 2 }}
+            >
+              <Typography variant="subtitle2" gutterBottom>
+                ¡Solicitud procesada!
+              </Typography>
+              {message}
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
                 Serás redirigido al inicio de sesión en unos segundos...
-              </p>
-            </div>
-          </div>
-        )}
+              </Typography>
+            </Alert>
+          )}
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="correo" className="form-label">
-              Correo Electrónico
-            </label>
-            <input
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="Correo Electrónico"
               type="email"
-              id="correo"
+              fullWidth
+              margin="normal"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
-              className="form-input"
               placeholder="usuario@empresa.com"
               required
               disabled={loading || !!message}
               autoFocus
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <EmailIcon color="action" />
+                  </InputAdornment>
+                ),
+              }}
+              helperText="Ingresa el correo con el que te registraste en el sistema."
             />
-            <small style={{ color: '#666', fontSize: '12px', marginTop: '5px' }}>
-              Ingresa el correo con el que te registraste en el sistema.
-            </small>
-          </div>
 
-          <button
-            type="submit"
-            className="login-button"
-            disabled={loading || !correo || !!message}
-            style={{ marginTop: '10px' }}
-          >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Procesando...
-              </>
-            ) : (
-              'Enviar Enlace de Restablecimiento'
-            )}
-          </button>
-        </form>
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              size="large"
+              disabled={loading || !correo || !!message}
+              sx={{ mt: 3, mb: 3 }}
+            >
+              {loading ? (
+                <CircularProgress size={24} sx={{ color: 'white' }} />
+              ) : (
+                'Enviar Enlace de Restablecimiento'
+              )}
+            </Button>
+          </form>
 
-        <div className="login-info">
-          <p className="info-text" style={{ textAlign: 'center' }}>
-            <Link to="/login" style={{
-              color: '#667eea',
-              textDecoration: 'none',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}>
-              <span style={{ fontSize: '18px' }}>←</span>
+          <Box sx={{ textAlign: 'center', mt: 3 }}>
+            <Link
+              component={RouterLink}
+              to="/login"
+              variant="body2"
+              sx={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                fontWeight: 600,
+                color: 'primary.main'
+              }}
+            >
+              <ArrowBack fontSize="small" />
               Volver al Inicio de Sesión
             </Link>
-          </p>
+          </Box>
 
-          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-            <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>
+          <Box sx={{ mt: 4, p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
+            <Typography variant="caption" color="text.secondary">
               <strong>📧 ¿No recibiste el correo?</strong><br />
               1. Revisa tu carpeta de spam o correo no deseado<br />
               2. Asegúrate de haber ingresado el correo correctamente<br />
               3. Espera unos minutos y vuelve a intentar
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+            </Typography>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
 };
 

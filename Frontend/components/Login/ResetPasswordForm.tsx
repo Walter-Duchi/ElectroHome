@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import {
+  Container,
+  Paper,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  CircularProgress,
+  Link,
+  InputAdornment,
+  IconButton,
+} from '@mui/material';
+import { VpnKey, Visibility, VisibilityOff, ArrowBack } from '@mui/icons-material';
+import { Link as RouterLink, useSearchParams, useNavigate } from 'react-router-dom';
 
 const ResetPasswordForm: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -8,6 +22,7 @@ const ResetPasswordForm: React.FC = () => {
 
   const [nuevaContrasena, setNuevaContrasena] = useState('');
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
@@ -117,136 +132,243 @@ const ResetPasswordForm: React.FC = () => {
     }
   };
 
+  const handleTogglePassword = () => {
+    setShowPassword(!showPassword);
+  };
+
   if (validating) {
     return (
-      <div className="login-container">
-        <div className="login-card">
-          <h2 className="login-title">Validando Enlace...</h2>
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <div className="spinner" style={{ margin: '0 auto' }}></div>
-            <p style={{ marginTop: '20px', color: '#666' }}>
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 4,
+            background: 'linear-gradient(135deg, #0056b3 0%, #003b82 100%)',
+          }}
+        >
+          <Paper
+            elevation={24}
+            sx={{
+              p: { xs: 3, md: 4 },
+              width: '100%',
+              maxWidth: 450,
+              borderRadius: 4,
+              border: '1px solid',
+              borderColor: 'divider',
+              textAlign: 'center',
+            }}
+          >
+            <CircularProgress sx={{ mb: 3 }} />
+            <Typography variant="h6" gutterBottom>
+              Validando Enlace...
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
               Verificando tu enlace de restablecimiento...
-            </p>
-          </div>
-        </div>
-      </div>
+            </Typography>
+          </Paper>
+        </Box>
+      </Container>
     );
   }
 
   if (!tokenValid) {
     return (
-      <div className="login-container">
-        <div className="login-card">
-          <h2 className="login-title">Enlace Inválido</h2>
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error || 'Este enlace de restablecimiento ha expirado o es inválido.'}
-          </div>
-          <div className="login-info" style={{ textAlign: 'center', marginTop: '30px' }}>
-            <p className="info-text">
-              <Link to="/forgot-password" style={{ color: '#667eea', textDecoration: 'none' }}>
+      <Container maxWidth="sm">
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 4,
+            background: 'linear-gradient(135deg, #0056b3 0%, #003b82 100%)',
+          }}
+        >
+          <Paper
+            elevation={24}
+            sx={{
+              p: { xs: 3, md: 4 },
+              width: '100%',
+              maxWidth: 450,
+              borderRadius: 4,
+              border: '1px solid',
+              borderColor: 'divider',
+              textAlign: 'center',
+            }}
+          >
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+              {error || 'Este enlace de restablecimiento ha expirado o es inválido.'}
+            </Alert>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+              <Link
+                component={RouterLink}
+                to="/forgot-password"
+                variant="body2"
+                sx={{
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  color: 'primary.main'
+                }}
+              >
                 Solicitar nuevo enlace
               </Link>
-            </p>
-            <p className="info-text" style={{ marginTop: '10px' }}>
-              <Link to="/login" style={{ color: '#667eea', textDecoration: 'none' }}>
+              <Link
+                component={RouterLink}
+                to="/login"
+                variant="body2"
+                sx={{
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  color: 'primary.main'
+                }}
+              >
                 Volver al Inicio de Sesión
               </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+            </Box>
+          </Paper>
+        </Box>
+      </Container>
     );
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h2 className="login-title">Crear Nueva Contraseña</h2>
-        <p className="login-subtitle">
-          Crea una contraseña segura para tu cuenta.
-        </p>
+    <Container maxWidth="sm">
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          py: 4,
+          background: 'linear-gradient(135deg, #0056b3 0%, #003b82 100%)',
+        }}
+      >
+        <Paper
+          elevation={24}
+          sx={{
+            p: { xs: 3, md: 4 },
+            width: '100%',
+            maxWidth: 450,
+            borderRadius: 4,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+              Crear Nueva Contraseña
+            </Typography>
+            <Typography variant="subtitle1" color="text.secondary">
+              Crea una contraseña segura para tu cuenta.
+            </Typography>
+          </Box>
 
-        {error && (
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error}
-          </div>
-        )}
+          {error && (
+            <Alert
+              severity="error"
+              sx={{ mb: 3, borderRadius: 2 }}
+              onClose={() => setError('')}
+            >
+              {error}
+            </Alert>
+          )}
 
-        {message && (
-          <div className="success-message" style={{
-            backgroundColor: '#d4edda',
-            borderColor: '#c3e6cb',
-            color: '#155724',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            marginBottom: '24px'
-          }}>
-            <span style={{ marginRight: '8px' }}>✅</span>
-            {message}
-          </div>
-        )}
+          {message && (
+            <Alert
+              severity="success"
+              sx={{ mb: 3, borderRadius: 2 }}
+            >
+              {message}
+            </Alert>
+          )}
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="nuevaContrasena" className="form-label">
-              Nueva Contraseña
-            </label>
-            <input
-              type="password"
-              id="nuevaContrasena"
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="Nueva Contraseña"
+              type={showPassword ? 'text' : 'password'}
+              fullWidth
+              margin="normal"
               value={nuevaContrasena}
               onChange={(e) => setNuevaContrasena(e.target.value)}
-              className="form-input"
               placeholder="••••••••"
               required
               disabled={loading}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <VpnKey color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={handleTogglePassword} edge="end">
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              helperText="Mínimo 8 caracteres, con mayúsculas, minúsculas, números y caracteres especiales"
             />
-            <div className="password-hint" style={{
-              fontSize: '12px',
-              color: '#666',
-              marginTop: '5px',
-              fontStyle: 'italic'
-            }}>
-              Mínimo 8 caracteres, con mayúsculas, minúsculas, números y caracteres especiales
-            </div>
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmarContrasena" className="form-label">
-              Confirmar Contraseña
-            </label>
-            <input
-              type="password"
-              id="confirmarContrasena"
+            <TextField
+              label="Confirmar Contraseña"
+              type={showPassword ? 'text' : 'password'}
+              fullWidth
+              margin="normal"
               value={confirmarContrasena}
               onChange={(e) => setConfirmarContrasena(e.target.value)}
-              className="form-input"
               placeholder="••••••••"
               required
               disabled={loading}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <VpnKey color="action" />
+                  </InputAdornment>
+                ),
+              }}
             />
-          </div>
 
-          <button
-            type="submit"
-            className="login-button"
-            disabled={loading || !nuevaContrasena || !confirmarContrasena}
-          >
-            {loading ? 'Restableciendo...' : 'Restablecer Contraseña'}
-          </button>
-        </form>
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              size="large"
+              disabled={loading || !nuevaContrasena || !confirmarContrasena}
+              sx={{ mt: 3, mb: 3 }}
+            >
+              {loading ? (
+                <CircularProgress size={24} sx={{ color: 'white' }} />
+              ) : (
+                'Restablecer Contraseña'
+              )}
+            </Button>
+          </form>
 
-        <div className="login-info">
-          <p className="info-text">
-            <Link to="/login" style={{ color: '#667eea', textDecoration: 'none' }}>
-              ← Volver al Inicio de Sesión
+          <Box sx={{ textAlign: 'center' }}>
+            <Link
+              component={RouterLink}
+              to="/login"
+              variant="body2"
+              sx={{
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                fontWeight: 600,
+                color: 'primary.main'
+              }}
+            >
+              <ArrowBack fontSize="small" />
+              Volver al Inicio de Sesión
             </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
 };
 
