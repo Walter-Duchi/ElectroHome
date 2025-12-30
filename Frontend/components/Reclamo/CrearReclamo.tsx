@@ -272,7 +272,7 @@ const CrearReclamo = () => {
             </Typography>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs:12, sm:6 }}>
                 <TextField
                   label="Número de Serie"
                   value={numeroSerie}
@@ -282,7 +282,7 @@ const CrearReclamo = () => {
                   disabled={loading}
                 />
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs:12, sm:4 }}>
                 <FormControl fullWidth>
                   <InputLabel>Forma de Compensación</InputLabel>
                   <Select
@@ -295,7 +295,7 @@ const CrearReclamo = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={2}>
+              <Grid size={{ xs:12, sm:2 }}>
                 <Button
                   variant="contained"
                   onClick={handleAgregarProducto}
@@ -425,7 +425,7 @@ const CrearReclamo = () => {
                   Información del Cliente
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs:12, sm:6 }}>
                     <Typography variant="body2" color="text.secondary">
                       RUC
                     </Typography>
@@ -433,7 +433,7 @@ const CrearReclamo = () => {
                       {rucCliente}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs:12, sm:6 }}>
                     <Typography variant="body2" color="text.secondary">
                       Razón Social
                     </Typography>
