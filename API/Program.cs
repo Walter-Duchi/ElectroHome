@@ -1,4 +1,5 @@
 using Application.DTOs.Auth;
+using Application.DTOs.Reclamo;
 using Application.DTOs.User;
 using Infrastructure.Data;
 using Infrastructure.Services;
@@ -48,6 +49,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBankAccountValidator, BankAccountValidator>();
+builder.Services.AddScoped<IReclamoService, ReclamoService>();
 
 builder.Services.AddCors(options =>
 {
@@ -236,4 +238,23 @@ app.MapGet("/api/users/allowed-roles", [Authorize] (IUserService userService, Ht
     return Results.Ok(allowedRoles);
 });
 
+// Endpoints para reclamos
+app.MapPost("/api/reclamos/validar-cliente", [Authorize(Roles = "Revisor")] async (ValidarClienteRequest request, IReclamoService reclamoService) =>
+{
+    var response = await reclamoService.ValidarClienteAsync(request.Ruc);
+    return response.EsValido ? Results.Ok(response) : Results.BadRequest(response);
+});
+
+app.MapPost("/api/reclamos/validar-producto", [Authorize(Roles = "Revisor")] async (ValidarProductoRequest request, IReclamoService reclamoService) =>
+{
+    var response = await reclamoService.ValidarProductoAsync(request.NumeroSerie);
+    return response.EsValido ? Results.Ok(response) : Results.BadRequest(response);
+});
+
+app.MapPost("/api/reclamos/crear", [Authorize(Roles = "Revisor")] async (CrearReclamoRequest request, IReclamoService reclamoService, HttpContext httpContext) =>
+{
+    var revisorId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var response = await reclamoService.CrearReclamoAsync(request, revisorId);
+    return response.Exito ? Results.Ok(response) : Results.BadRequest(response);
+});
 app.Run();

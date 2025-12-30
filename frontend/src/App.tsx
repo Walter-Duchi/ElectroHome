@@ -7,12 +7,22 @@ import ForgotPasswordForm from '../components/Login/ForgotPasswordForm';
 import ResetPasswordForm from '../components/Login/ResetPasswordForm';
 import DashboardLayout from '../components/Layout/DashboardLayout';
 import Dashboard from '../components/Dashboard/Dashboard';
+import CrearReclamo from '../components/Reclamo/CrearReclamo';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const { auth } = useAuth();
 
   if (!auth.isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && auth.user?.rol && !allowedRoles.includes(auth.user.rol)) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -46,22 +56,35 @@ const AppContent: React.FC = () => {
   return (
     <Router>
       <Routes>
+        {/* Rutas públicas */}
         <Route
           path="/login"
-          element={auth.isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />}
+          element={
+            auth.isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />
+          }
         />
         <Route
           path="/forgot-password"
           element={
-            auth.isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordForm />
+            auth.isAuthenticated ? (
+              <Navigate to="/" replace />
+            ) : (
+              <ForgotPasswordForm />
+            )
           }
         />
         <Route
           path="/reset-password"
           element={
-            auth.isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordForm />
+            auth.isAuthenticated ? (
+              <Navigate to="/" replace />
+            ) : (
+              <ResetPasswordForm />
+            )
           }
         />
+
+        {/* Rutas protegidas con DashboardLayout */}
         <Route
           path="/"
           element={
@@ -72,6 +95,20 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* Ruta para crear reclamos - Solo para Revisores */}
+        <Route
+          path="/crear-reclamo"
+          element={
+            <ProtectedRoute allowedRoles={['Revisor']}>
+              <DashboardLayout>
+                <CrearReclamo />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Ruta por defecto para cualquier otra ruta */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

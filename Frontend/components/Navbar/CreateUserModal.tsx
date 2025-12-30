@@ -38,7 +38,7 @@ interface CreateUserModalProps {
 
 const steps = ['Información Personal', 'Datos de Contacto', 'Información Bancaria'];
 
-const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose }) => {
+function CreateUserModal({ allowedRoles, onClose }: CreateUserModalProps) {
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     nombres: '',
@@ -161,8 +161,12 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
 
         alert(`Usuario ${response.nombres} creado exitosamente!`);
         onClose();
-      } catch (error: any) {
-        setSubmitError(error.message);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setSubmitError(error.message);
+        } else {
+          setSubmitError('Error desconocido');
+        }
       } finally {
         setLoading(false);
       }
@@ -434,7 +438,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
         </Stepper>
       </Box>
 
-      <form onSubmit={handleSubmit}>
+      <Box component="form" onSubmit={handleSubmit}>
         <DialogContent>
           {submitError && (
             <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
@@ -466,7 +470,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ allowedRoles, onClose
             )}
           </Button>
         </DialogActions>
-      </form>
+      </Box>
     </Dialog>
   );
 };

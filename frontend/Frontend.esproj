@@ -12,5 +12,6 @@
     <Folder Include="components\Login\" />
     <Folder Include="components\Dashboard\" />
     <Folder Include="components\Layout\" />
+    <Folder Include="components\Reclamo\" />
   </ItemGroup>
 </Project>

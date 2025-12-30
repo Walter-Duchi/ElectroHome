@@ -1,6 +1,7 @@
-// components/Layout/DashboardLayout.tsx
-
+import { AddReaction as AddReclamoIcon } from '@mui/icons-material';
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import {
   AppBar,
   Box,
@@ -40,7 +41,9 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+function DashboardLayout({ children }: DashboardLayoutProps) {
+  const navigate = useNavigate();
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
@@ -195,6 +198,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               sx={{ mr: 2 }}
             >
               Crear Usuario
+            </Button>
+          )}
+
+          {userRole === 'Revisor' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddReclamoIcon />}
+              onClick={() => navigate('/crear-reclamo')}
+              sx={{ mr: 2 }}
+            >
+              Crear Reclamo
             </Button>
           )}
 
