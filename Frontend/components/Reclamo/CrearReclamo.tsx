@@ -177,6 +177,7 @@ const CrearReclamo = () => {
     setSuccessMessage('');
 
     const productosValidos = productos.filter(p => p.tieneGarantia);
+
     if (productosValidos.length === 0) {
       setErrorMessage('Debe agregar al menos un producto válido con garantía');
       setLoading(false);
@@ -184,30 +185,47 @@ const CrearReclamo = () => {
     }
 
     try {
+      console.log('=== DEPURACIÓN - ANTES DE ENVIAR ===');
+      console.log('Cliente RUC:', rucCliente);
+      console.log('Productos válidos:', productosValidos);
+
+      const productosParaEnviar = productosValidos.map(p => ({
+        numeroSerie: p.numeroSerie.trim(),
+        formaCompensacion: p.formaCompensacion
+      }));
+
       const request = {
-        rucCliente,
-        productos: productosValidos.map(p => ({
-          numeroSerie: p.numeroSerie,
-          formaCompensacion: p.formaCompensacion
-        }))
+        rucCliente: rucCliente.trim(),
+        productos: productosParaEnviar
       };
+
+      console.log('Enviando solicitud:', JSON.stringify(request, null, 2));
 
       const response = await reclamoService.crearReclamo(request);
 
-      if (response.exito && response.pdfBase64 && response.pdfFileName) {
-        setSuccessMessage('Reclamo creado exitosamente. Descargando comprobante...');
+      console.log('Respuesta del servidor:', response);
 
-        reclamoService.descargarPdf(response.pdfBase64, response.pdfFileName);
+      if (response.exito) {
+        setSuccessMessage('Reclamo creado exitosamente!');
 
-        setTimeout(() => {
-          navigate('/');
-        }, 3000);
+        if (response.pdfBase64 && response.pdfFileName) {
+          setTimeout(() => {
+            reclamoService.descargarPdf(response.pdfBase64!, response.pdfFileName!);
+            setTimeout(() => {
+              navigate('/');
+            }, 2000);
+          }, 1000);
+        }
       } else {
         setErrorMessage(response.mensaje || 'Error al crear el reclamo');
       }
     } catch (err: unknown) {
-      console.error('Error creando reclamo:', err);
-      setErrorMessage('Error al crear el reclamo');
+      console.error('Error completo:', err);
+      if (err instanceof Error) {
+        setErrorMessage(`Error: ${err.message}`);
+      } else {
+        setErrorMessage('Error desconocido al crear el reclamo');
+      }
     } finally {
       setLoading(false);
     }
