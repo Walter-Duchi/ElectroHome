@@ -186,7 +186,7 @@ namespace Infrastructure.Services
             try
             {
                 _logger.LogInformation("========================================");
-                _logger.LogInformation("INICIANDO CREACIÓN DE RECLAMO CON VERIFICACIÓN DE TÉCNICOS");
+                _logger.LogInformation("INICIANDO CREACIÓN DE RECLAMO CON DISTRIBUCIÓN EQUITATIVA DE TÉCNICOS");
                 _logger.LogInformation("RevisorId: {RevisorId}", revisorId);
                 _logger.LogInformation("RUC Cliente: {RucCliente}", request.RucCliente);
                 _logger.LogInformation("Productos solicitados: {@Productos}", request.Productos);
@@ -208,8 +208,8 @@ namespace Infrastructure.Services
                 }
                 _logger.LogInformation("Cliente validado: {ClienteId} - {Nombre}", cliente.Id, $"{cliente.Nombres} {cliente.Apellidos}");
 
-                // 2. Validar cada producto y pre-asignar técnicos
-                var productosReclamados = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario? tecnicoAsignado)>();
+                // 2. Validar cada producto y obtener información de marcas
+                var productosConMarca = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId)>();
 
                 foreach (var productoReq in request.Productos)
                 {
@@ -282,45 +282,14 @@ namespace Infrastructure.Services
                         .Select(nsp => nsp.FkProductoNavigation.FkMarca)
                         .FirstOrDefaultAsync();
 
-                    // Asignar técnico ANTES de crear el reclamo para garantizar asignación
-                    var tecnicoAsignado = await AsignarTecnicoConValidacionAsync(marcaId, validacion.ProductoId.Value);
-
-                    if (tecnicoAsignado == null)
-                    {
-                        _logger.LogError("CRÍTICO: No se pudo asignar técnico certificado para producto: {NumeroSerie}, MarcaId: {MarcaId}",
-                            productoReq.NumeroSerie, marcaId);
-
-                        await transaction.RollbackAsync();
-                        return new CrearReclamoResponse
-                        {
-                            Exito = false,
-                            Mensaje = $"No se pudo asignar un técnico certificado para el producto {productoReq.NumeroSerie}. No hay técnicos disponibles certificados en esta marca."
-                        };
-                    }
-
-                    _logger.LogInformation("Técnico pre-asignado para producto {NumeroSerie}: {TecnicoId} - {Nombre}",
-                        productoReq.NumeroSerie, tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}");
-
-                    productosReclamados.Add((validacion.ProductoId.Value, productoReq.FormaCompensacion, productoReq.NumeroSerie, marcaId, tecnicoAsignado));
+                    productosConMarca.Add((validacion.ProductoId.Value, productoReq.FormaCompensacion, productoReq.NumeroSerie, marcaId));
                 }
 
-                // 3. Verificar que TODOS los productos tengan técnico asignado
-                if (productosReclamados.Any(p => p.tecnicoAsignado == null))
-                {
-                    _logger.LogError("CRÍTICO: Uno o más productos no tienen técnico asignado");
-                    await transaction.RollbackAsync();
-                    return new CrearReclamoResponse
-                    {
-                        Exito = false,
-                        Mensaje = "No se pudieron asignar técnicos certificados para todos los productos. El reclamo no puede ser creado."
-                    };
-                }
-
-                // 4. Crear código de reclamo
+                // 3. Crear código de reclamo
                 var codigoReclamo = $"REC-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper()}";
                 _logger.LogInformation("Código de reclamo generado: {CodigoReclamo}", codigoReclamo);
 
-                // 5. Crear entidad Reclamo
+                // 4. Crear entidad Reclamo
                 var reclamo = new Reclamo
                 {
                     CodigoReclamo = codigoReclamo,
@@ -332,23 +301,85 @@ namespace Infrastructure.Services
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Reclamo creado en BD con ID: {ReclamoId}", reclamo.Id);
 
-                // 6. Crear productos del reclamo CON técnicos ya asignados
-                var reclamosProductos = new List<ReclamosProductoSn>();
+                // 5. ASIGNACIÓN EQUITATIVA DE TÉCNICOS - PRODUCTO POR PRODUCTO
+                _logger.LogInformation("========================================");
+                _logger.LogInformation("INICIANDO ASIGNACIÓN EQUITATIVA DE TÉCNICOS");
+                _logger.LogInformation("Total productos a asignar: {CantidadProductos}", productosConMarca.Count);
+                _logger.LogInformation("========================================");
 
-                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado) in productosReclamados)
+                // Obtener todos los técnicos certificados por marca
+                var certificacionesPorMarca = await _context.UsuariosCertificacionMarcas
+                    .Include(ucm => ucm.FkTecnicoNavigation)
+                    .Where(ucm => ucm.FkTecnicoNavigation.Rol == "Tecnico")
+                    .GroupBy(ucm => ucm.FkMarca)
+                    .ToDictionaryAsync(
+                        g => g.Key,
+                        g => g.Select(ucm => ucm.FkTecnicoNavigation).ToList()
+                    );
+
+                // Contador para distribución round-robin por marca
+                var indiceTecnicoPorMarca = new Dictionary<int, int>();
+
+                // Obtener carga actual de trabajo para cada técnico
+                var cargaTrabajo = await _context.ReclamosProductoSns
+                    .Where(rps => rps.FkTecnicoAsignado != null && (rps.Estado == "Pendiente" || rps.Estado == "En Revision"))
+                    .GroupBy(rps => rps.FkTecnicoAsignado)
+                    .Select(g => new { TecnicoId = g.Key, Carga = g.Count() })
+                    .ToDictionaryAsync(x => x.TecnicoId, x => x.Carga);
+
+                // Lista para guardar asignaciones finales
+                var productosConTecnico = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario tecnicoAsignado)>();
+
+                // Procesar cada producto uno por uno
+                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId) in productosConMarca)
                 {
-                    if (tecnicoAsignado == null)
+                    _logger.LogInformation("Procesando producto {NumeroSerie} de marca {MarcaId}", numeroSerie, marcaId);
+
+                    // Verificar si hay técnicos certificados para esta marca
+                    if (!certificacionesPorMarca.ContainsKey(marcaId) || !certificacionesPorMarca[marcaId].Any())
                     {
-                        _logger.LogError("CRÍTICO: Técnico null encontrado para producto {ProductoId}", numeroSerieProductoId);
+                        _logger.LogError("CRÍTICO: No hay técnicos certificados para la marca {MarcaId}", marcaId);
                         await transaction.RollbackAsync();
                         return new CrearReclamoResponse
                         {
                             Exito = false,
-                            Mensaje = "Error crítico: Técnico no asignado para un producto."
+                            Mensaje = $"No hay técnicos certificados para la marca del producto {numeroSerie}. El reclamo no puede ser creado."
                         };
                     }
 
-                    // Verificar certificación del técnico antes de asignar
+                    // Obtener técnicos certificados para esta marca
+                    var tecnicosCertificados = certificacionesPorMarca[marcaId];
+
+                    // Asignar técnico usando algoritmo round-robin con balance de carga
+                    Usuario tecnicoAsignado = null;
+
+                    // Primero intentamos asignar al técnico con menor carga
+                    var tecnicosOrdenadosPorCarga = tecnicosCertificados
+                        .OrderBy(t => cargaTrabajo.GetValueOrDefault(t.Id, 0))
+                        .ToList();
+
+                    tecnicoAsignado = tecnicosOrdenadosPorCarga.First();
+
+                    // Si hay empate en carga, usamos round-robin
+                    var cargaMinima = cargaTrabajo.GetValueOrDefault(tecnicosOrdenadosPorCarga.First().Id, 0);
+                    var tecnicosConCargaMinima = tecnicosOrdenadosPorCarga
+                        .Where(t => cargaTrabajo.GetValueOrDefault(t.Id, 0) == cargaMinima)
+                        .ToList();
+
+                    if (tecnicosConCargaMinima.Count > 1)
+                    {
+                        // Usar round-robin para desempatar
+                        if (!indiceTecnicoPorMarca.ContainsKey(marcaId))
+                        {
+                            indiceTecnicoPorMarca[marcaId] = 0;
+                        }
+
+                        var indice = indiceTecnicoPorMarca[marcaId] % tecnicosConCargaMinima.Count;
+                        tecnicoAsignado = tecnicosConCargaMinima[indice];
+                        indiceTecnicoPorMarca[marcaId] = (indice + 1) % tecnicosConCargaMinima.Count;
+                    }
+
+                    // Verificar certificación del técnico (ya está garantizado por la consulta)
                     var tieneCertificacion = await _context.UsuariosCertificacionMarcas
                         .AnyAsync(ucm => ucm.FkMarca == marcaId && ucm.FkTecnico == tecnicoAsignado.Id);
 
@@ -361,6 +392,67 @@ namespace Infrastructure.Services
                         {
                             Exito = false,
                             Mensaje = "Error de certificación: Técnico asignado no tiene certificación válida."
+                        };
+                    }
+
+                    // Actualizar carga de trabajo para el próximo producto
+                    if (cargaTrabajo.ContainsKey(tecnicoAsignado.Id))
+                    {
+                        cargaTrabajo[tecnicoAsignado.Id]++;
+                    }
+                    else
+                    {
+                        cargaTrabajo[tecnicoAsignado.Id] = 1;
+                    }
+
+                    productosConTecnico.Add((numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado));
+
+                    _logger.LogInformation("Asignado técnico {TecnicoId} ({Nombre}) al producto {NumeroSerie}. Carga actual: {Carga}",
+                        tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}",
+                        numeroSerie, cargaTrabajo[tecnicoAsignado.Id]);
+                }
+
+                // 6. Verificar que TODOS los productos tengan técnico asignado (esto ya está garantizado por la lógica anterior)
+                if (productosConTecnico.Any(p => p.tecnicoAsignado == null))
+                {
+                    _logger.LogError("CRÍTICO: Uno o más productos no tienen técnico asignado");
+                    await transaction.RollbackAsync();
+                    return new CrearReclamoResponse
+                    {
+                        Exito = false,
+                        Mensaje = "No se pudieron asignar técnicos certificados para todos los productos. El reclamo no puede ser creado."
+                    };
+                }
+
+                _logger.LogInformation("========================================");
+                _logger.LogInformation("ASIGNACIONES COMPLETADAS - RESUMEN");
+                _logger.LogInformation("Total productos: {TotalProductos}", productosConTecnico.Count);
+
+                // Log distribución de carga final
+                foreach (var carga in cargaTrabajo)
+                {
+                    var tecnico = await _context.Usuarios.FindAsync(carga.Key);
+                    if (tecnico != null)
+                    {
+                        _logger.LogInformation("Técnico {TecnicoId} ({Nombre}): {Carga} productos asignados",
+                            tecnico.Id, $"{tecnico.Nombres} {tecnico.Apellidos}", carga.Value);
+                    }
+                }
+                _logger.LogInformation("========================================");
+
+                // 7. Crear productos del reclamo CON técnicos ya asignados
+                var reclamosProductos = new List<ReclamosProductoSn>();
+
+                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado) in productosConTecnico)
+                {
+                    if (tecnicoAsignado == null)
+                    {
+                        _logger.LogError("CRÍTICO: Técnico null encontrado para producto {ProductoId}", numeroSerieProductoId);
+                        await transaction.RollbackAsync();
+                        return new CrearReclamoResponse
+                        {
+                            Exito = false,
+                            Mensaje = "Error crítico: Técnico no asignado para un producto."
                         };
                     }
 
@@ -403,9 +495,9 @@ namespace Infrastructure.Services
                     };
                 }
 
-                // 7. Generar PDF REAL (no HTML)
+                // 8. Generar PDF REAL (no HTML)
                 _logger.LogInformation("Generando PDF REAL para reclamo {ReclamoId}", reclamo.Id);
-                var pdfResult = await GenerarPdfRealAsync(reclamo.Id, codigoReclamo, cliente, productosReclamados);
+                var pdfResult = await GenerarPdfRealAsync(reclamo.Id, codigoReclamo, cliente, productosConTecnico);
 
                 if (!pdfResult.exito)
                 {
@@ -420,15 +512,19 @@ namespace Infrastructure.Services
 
                 _logger.LogInformation("PDF generado correctamente y guardado en: {RutaPdf}", pdfResult.rutaArchivo);
 
-                // 8. Commit de transacción
+                // 9. Commit de transacción
                 await transaction.CommitAsync();
-                _logger.LogInformation("Transacción completada exitosamente. Reclamo {ReclamoId} creado con {Cantidad} productos y técnicos asignados.",
-                    reclamo.Id, productosReclamados.Count);
+                _logger.LogInformation("========================================");
+                _logger.LogInformation("TRANSACCIÓN COMPLETADA EXITOSAMENTE");
+                _logger.LogInformation("Reclamo {ReclamoId} creado con {Cantidad} productos", reclamo.Id, productosConTecnico.Count);
+                _logger.LogInformation("Todos los productos tienen técnico asignado");
+                _logger.LogInformation("Cargas distribuidas equitativamente entre técnicos");
+                _logger.LogInformation("========================================");
 
                 return new CrearReclamoResponse
                 {
                     Exito = true,
-                    Mensaje = "Reclamo creado exitosamente con asignación de técnicos verificada.",
+                    Mensaje = "Reclamo creado exitosamente con asignación equitativa de técnicos.",
                     ReclamoId = reclamo.Id,
                     CodigoReclamo = codigoReclamo,
                     PdfBase64 = pdfResult.pdfBase64,
@@ -456,62 +552,9 @@ namespace Infrastructure.Services
             }
         }
 
-        private async Task<Usuario?> AsignarTecnicoConValidacionAsync(int marcaId, int productoId)
-        {
-            _logger.LogInformation("Buscando técnicos certificados para marca {MarcaId}, producto {ProductoId}", marcaId, productoId);
-
-            // Obtener técnicos certificados para la marca específica
-            var tecnicosCertificados = await _context.UsuariosCertificacionMarcas
-                .Where(ucm => ucm.FkMarca == marcaId)
-                .Select(ucm => ucm.FkTecnicoNavigation)
-                .Where(t => t.Rol == "Tecnico")
-                .ToListAsync();
-
-            if (!tecnicosCertificados.Any())
-            {
-                _logger.LogWarning("No hay técnicos certificados para la marca {MarcaId}", marcaId);
-                return null;
-            }
-
-            _logger.LogInformation("Encontrados {Cantidad} técnicos certificados para marca {MarcaId}",
-                tecnicosCertificados.Count, marcaId);
-
-            // Obtener carga de trabajo actual (reclamos pendientes) de cada técnico
-            var cargaTrabajo = await _context.ReclamosProductoSns
-                .Where(rps => rps.FkTecnicoAsignado != null && rps.Estado == "Pendiente")
-                .GroupBy(rps => rps.FkTecnicoAsignado)
-                .Select(g => new { TecnicoId = g.Key, Carga = g.Count() })
-                .ToDictionaryAsync(x => x.TecnicoId, x => x.Carga);
-
-            // Asignar al técnico con menor carga
-            Usuario? tecnicoAsignado = null;
-            int minCarga = int.MaxValue;
-
-            foreach (var tecnico in tecnicosCertificados)
-            {
-                cargaTrabajo.TryGetValue(tecnico.Id, out int carga);
-                _logger.LogInformation("Técnico {TecnicoId} ({Nombre}) - Carga actual: {Carga}",
-                    tecnico.Id, $"{tecnico.Nombres} {tecnico.Apellidos}", carga);
-
-                if (carga < minCarga)
-                {
-                    minCarga = carga;
-                    tecnicoAsignado = tecnico;
-                }
-            }
-
-            if (tecnicoAsignado != null)
-            {
-                _logger.LogInformation("Técnico asignado: {TecnicoId} ({Nombre}) con carga {Carga}",
-                    tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}", minCarga);
-            }
-
-            return tecnicoAsignado;
-        }
-
         private async Task<(bool exito, string pdfBase64, string rutaArchivo, string mensajeError)> GenerarPdfRealAsync(
             int reclamoId, string codigoReclamo, Usuario cliente,
-            List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario? tecnicoAsignado)> productos)
+            List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario tecnicoAsignado)> productos)
         {
             try
             {
@@ -604,17 +647,29 @@ namespace Infrastructure.Services
                                     }
                                 });
 
-                                // Resumen
-                                x.Item().PaddingTop(15).Text("RESUMEN").SemiBold().FontSize(14);
+                                // Resumen de distribución
+                                x.Item().PaddingTop(15).Text("DISTRIBUCIÓN DE TÉCNICOS").SemiBold().FontSize(14);
                                 x.Item().Text($"Total de productos: {productosDetalle.Count}");
-                                x.Item().Text($"Técnicos asignados: {productosDetalle.Count(p => p.TecnicoId != null)} de {productosDetalle.Count}");
+                                x.Item().Text($"Todos los productos tienen técnico asignado: SÍ");
+
+                                // Distribución por técnico
+                                var distribucionPorTecnico = productosDetalle
+                                    .GroupBy(p => p.TecnicoAsignado)
+                                    .Select(g => new { Tecnico = g.Key, Cantidad = g.Count() })
+                                    .ToList();
+
+                                foreach (var dist in distribucionPorTecnico)
+                                {
+                                    x.Item().Text($"• {dist.Tecnico}: {dist.Cantidad} producto(s)");
+                                }
 
                                 // Observaciones
                                 x.Item().PaddingTop(15).Text("OBSERVACIONES").SemiBold().FontSize(14);
                                 x.Item().Text("1. Este comprobante debe ser presentado para cualquier consulta sobre el estado del reclamo.");
                                 x.Item().Text("2. Los productos serán revisados por técnicos certificados en las marcas correspondientes.");
                                 x.Item().Text("3. Cada producto tiene asignado un técnico específico según su marca.");
-                                x.Item().Text("4. El tiempo de resolución depende de la complejidad del caso.");
+                                x.Item().Text("4. La carga de trabajo se distribuyó equitativamente entre todos los técnicos disponibles.");
+                                x.Item().Text("5. El tiempo de resolución depende de la complejidad del caso.");
                             });
 
                         page.Footer()
