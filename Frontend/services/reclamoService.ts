@@ -94,13 +94,48 @@ export const reclamoService = {
             const link = document.createElement('a');
             link.href = url;
             link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+
+            // Intentar guardar en carpeta Documentos/reclamos
+            try {
+                // Para Chrome/Edge (experimental)
+                if ('showSaveFilePicker' in window) {
+                    // @ts-ignore
+                    window.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: [{
+                            description: 'PDF Files',
+                            accept: { 'application/pdf': ['.pdf'] }
+                        }]
+                    }).then(async (handle: any) => {
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                    }).catch(() => {
+                        // Fallback si el usuario cancela
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    });
+                } else {
+                    // Fallback para otros navegadores
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            } catch (error) {
+                // Fallback si hay error
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
 
             window.URL.revokeObjectURL(url);
+
+            // Mostrar mensaje informativo
+            alert('PDF descargado. Se recomienda guardarlo en la carpeta Documentos/reclamos para mejor organización.');
         } catch (error) {
             console.error('Error descargando PDF:', error);
+            alert('Error al descargar el PDF. Por favor, contacte al administrador.');
         }
     }
 };

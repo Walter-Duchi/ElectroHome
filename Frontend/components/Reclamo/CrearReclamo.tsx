@@ -1,5 +1,4 @@
 import type React from 'react';
-
 import { useState } from 'react';
 import {
   Box,
@@ -206,15 +205,24 @@ const CrearReclamo = () => {
       console.log('Respuesta del servidor:', response);
 
       if (response.exito) {
-        setSuccessMessage('Reclamo creado exitosamente!');
+        setSuccessMessage('¡Reclamo creado exitosamente! Todos los productos tienen técnicos asignados.');
 
         if (response.pdfBase64 && response.pdfFileName) {
           setTimeout(() => {
             reclamoService.descargarPdf(response.pdfBase64!, response.pdfFileName!);
+
+            // Mostrar mensaje de éxito
             setTimeout(() => {
-              navigate('/');
-            }, 2000);
+              setSuccessMessage('¡Reclamo creado exitosamente! PDF descargado en Documentos/reclamos');
+              setTimeout(() => {
+                navigate('/');
+              }, 3000);
+            }, 1000);
           }, 1000);
+        } else {
+          setTimeout(() => {
+            navigate('/');
+          }, 2000);
         }
       } else {
         setErrorMessage(response.mensaje || 'Error al crear el reclamo');
@@ -290,7 +298,7 @@ const CrearReclamo = () => {
             </Typography>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs:12, sm:6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   label="Número de Serie"
                   value={numeroSerie}
@@ -300,7 +308,7 @@ const CrearReclamo = () => {
                   disabled={loading}
                 />
               </Grid>
-              <Grid size={{ xs:12, sm:4 }}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <FormControl fullWidth>
                   <InputLabel>Forma de Compensación</InputLabel>
                   <Select
@@ -313,7 +321,7 @@ const CrearReclamo = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs:12, sm:2 }}>
+              <Grid size={{ xs: 12, sm: 2 }}>
                 <Button
                   variant="contained"
                   onClick={handleAgregarProducto}
@@ -443,7 +451,7 @@ const CrearReclamo = () => {
                   Información del Cliente
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid size={{ xs:12, sm:6 }}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="body2" color="text.secondary">
                       RUC
                     </Typography>
@@ -451,7 +459,7 @@ const CrearReclamo = () => {
                       {rucCliente}
                     </Typography>
                   </Grid>
-                  <Grid size={{ xs:12, sm:6 }}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="body2" color="text.secondary">
                       Razón Social
                     </Typography>
@@ -466,7 +474,7 @@ const CrearReclamo = () => {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="subtitle1" gutterBottom>
-                  Productos a Reclamar
+                  Productos a Reclamado
                 </Typography>
                 <TableContainer>
                   <Table size="small">
@@ -510,8 +518,24 @@ const CrearReclamo = () => {
             </Card>
 
             <Alert severity="info" sx={{ mb: 3 }}>
-              Al confirmar, se generará un comprobante PDF y se asignarán técnicos para revisión.
-              El sistema distribuirá equitativamente la carga de trabajo entre técnicos certificados.
+              <Typography variant="subtitle2" gutterBottom>
+                Verificación de Asignación de Técnicos
+              </Typography>
+              <Typography variant="body2">
+                1. El sistema verificará que existan técnicos certificados para cada marca de producto.<br />
+                2. Se asignará un técnico específico a cada producto según su marca.<br />
+                3. La carga de trabajo se distribuirá equitativamente entre técnicos certificados.<br />
+                4. Si algún producto no puede tener técnico asignado, el reclamo NO se creará.<br />
+                5. Se generará un PDF con todos los detalles y se guardará en Documentos/reclamos.
+              </Typography>
+            </Alert>
+
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              <Typography variant="body2">
+                <strong>Importante:</strong> Este proceso garantiza que cada producto sea revisado por un técnico
+                certificado en la marca correspondiente. Si falla la asignación de algún técnico,
+                todo el reclamo será cancelado automáticamente.
+              </Typography>
             </Alert>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -576,9 +600,17 @@ const CrearReclamo = () => {
         <DialogTitle>Confirmar Creación de Reclamo</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Está seguro de generar el reclamo?
-            Se imprimirá el comprobante de reclamo y se asignarán distintos técnicos para
-            la revisión de cada uno de los productos.
+            <strong>Verificación de Asignación de Técnicos:</strong><br /><br />
+
+            ¿Está seguro de crear el reclamo? El sistema realizará las siguientes verificaciones:<br /><br />
+
+            1. Validará que existan técnicos certificados para cada marca de producto.<br />
+            2. Asignará un técnico específico a cada producto (distribución equitativa).<br />
+            3. Si algún producto no puede tener técnico asignado, el reclamo NO se creará.<br />
+            4. Generará un PDF real (no HTML) con todos los detalles.<br />
+            5. El PDF se guardará en Documentos/reclamos/<br /><br />
+
+            <strong>¿Desea continuar?</strong>
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -586,9 +618,10 @@ const CrearReclamo = () => {
           <Button
             onClick={handleConfirmarReclamo}
             variant="contained"
+            color="primary"
             autoFocus
           >
-            Confirmar
+            Sí, crear reclamo
           </Button>
         </DialogActions>
       </Dialog>

@@ -8,6 +8,15 @@ using Infrastructure.Data;
 using Application.DTOs.Reclamo;
 using Infrastructure.Models;
 using System.Transactions;
+using System.IO;
+using System.Text;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using Microsoft.Extensions.Configuration;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Net.Http;
 
 namespace Infrastructure.Services
 {
@@ -15,11 +24,14 @@ namespace Infrastructure.Services
     {
         private readonly ReclamosContext _context;
         private readonly ILogger<ReclamoService> _logger;
+        private readonly IConfiguration _configuration;
 
-        public ReclamoService(ReclamosContext context, ILogger<ReclamoService> logger)
+        public ReclamoService(ReclamosContext context, ILogger<ReclamoService> logger, IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
+            QuestPDF.Settings.License = LicenseType.Community;
         }
 
         public async Task<ValidarClienteResponse> ValidarClienteAsync(string ruc)
@@ -174,7 +186,7 @@ namespace Infrastructure.Services
             try
             {
                 _logger.LogInformation("========================================");
-                _logger.LogInformation("INICIANDO CREACIÓN DE RECLAMO");
+                _logger.LogInformation("INICIANDO CREACIÓN DE RECLAMO CON VERIFICACIÓN DE TÉCNICOS");
                 _logger.LogInformation("RevisorId: {RevisorId}", revisorId);
                 _logger.LogInformation("RUC Cliente: {RucCliente}", request.RucCliente);
                 _logger.LogInformation("Productos solicitados: {@Productos}", request.Productos);
@@ -196,8 +208,8 @@ namespace Infrastructure.Services
                 }
                 _logger.LogInformation("Cliente validado: {ClienteId} - {Nombre}", cliente.Id, $"{cliente.Nombres} {cliente.Apellidos}");
 
-                // 2. Validar cada producto
-                var productosReclamados = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie)>();
+                // 2. Validar cada producto y pre-asignar técnicos
+                var productosReclamados = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario? tecnicoAsignado)>();
 
                 foreach (var productoReq in request.Productos)
                 {
@@ -205,6 +217,7 @@ namespace Infrastructure.Services
 
                     // Primero, verificar si el producto ya está en un reclamo
                     var productoExistente = await _context.NumeroSerieProductos
+                        .Include(nsp => nsp.FkProductoNavigation)
                         .FirstOrDefaultAsync(nsp => nsp.NumeroSerie == productoReq.NumeroSerie);
 
                     if (productoExistente == null)
@@ -221,7 +234,7 @@ namespace Infrastructure.Services
                     // Verificar si ya está en un reclamo activo
                     var yaEnReclamo = await _context.ReclamosProductoSns
                         .AnyAsync(rps => rps.FkNumeroSerieProductos == productoExistente.Id &&
-                                       rps.Estado != "Compensado");
+                        (rps.Estado == "Pendiente" || rps.Estado == "En Revision" || rps.Estado == "Aprobado"));
 
                     if (yaEnReclamo)
                     {
@@ -263,16 +276,51 @@ namespace Infrastructure.Services
                         };
                     }
 
-                    productosReclamados.Add((validacion.ProductoId.Value, productoReq.FormaCompensacion, productoReq.NumeroSerie));
-                    _logger.LogInformation("Producto {NumeroSerie} agregado con ID: {ProductoId}",
-                        productoReq.NumeroSerie, validacion.ProductoId.Value);
+                    // Obtener marca del producto para asignación de técnico
+                    var marcaId = await _context.NumeroSerieProductos
+                        .Where(nsp => nsp.Id == validacion.ProductoId.Value)
+                        .Select(nsp => nsp.FkProductoNavigation.FkMarca)
+                        .FirstOrDefaultAsync();
+
+                    // Asignar técnico ANTES de crear el reclamo para garantizar asignación
+                    var tecnicoAsignado = await AsignarTecnicoConValidacionAsync(marcaId, validacion.ProductoId.Value);
+
+                    if (tecnicoAsignado == null)
+                    {
+                        _logger.LogError("CRÍTICO: No se pudo asignar técnico certificado para producto: {NumeroSerie}, MarcaId: {MarcaId}",
+                            productoReq.NumeroSerie, marcaId);
+
+                        await transaction.RollbackAsync();
+                        return new CrearReclamoResponse
+                        {
+                            Exito = false,
+                            Mensaje = $"No se pudo asignar un técnico certificado para el producto {productoReq.NumeroSerie}. No hay técnicos disponibles certificados en esta marca."
+                        };
+                    }
+
+                    _logger.LogInformation("Técnico pre-asignado para producto {NumeroSerie}: {TecnicoId} - {Nombre}",
+                        productoReq.NumeroSerie, tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}");
+
+                    productosReclamados.Add((validacion.ProductoId.Value, productoReq.FormaCompensacion, productoReq.NumeroSerie, marcaId, tecnicoAsignado));
                 }
 
-                // 3. Crear código de reclamo
+                // 3. Verificar que TODOS los productos tengan técnico asignado
+                if (productosReclamados.Any(p => p.tecnicoAsignado == null))
+                {
+                    _logger.LogError("CRÍTICO: Uno o más productos no tienen técnico asignado");
+                    await transaction.RollbackAsync();
+                    return new CrearReclamoResponse
+                    {
+                        Exito = false,
+                        Mensaje = "No se pudieron asignar técnicos certificados para todos los productos. El reclamo no puede ser creado."
+                    };
+                }
+
+                // 4. Crear código de reclamo
                 var codigoReclamo = $"REC-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper()}";
                 _logger.LogInformation("Código de reclamo generado: {CodigoReclamo}", codigoReclamo);
 
-                // 4. Crear entidad Reclamo
+                // 5. Crear entidad Reclamo
                 var reclamo = new Reclamo
                 {
                     CodigoReclamo = codigoReclamo,
@@ -284,28 +332,37 @@ namespace Infrastructure.Services
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Reclamo creado en BD con ID: {ReclamoId}", reclamo.Id);
 
-                // 5. Crear productos del reclamo
+                // 6. Crear productos del reclamo CON técnicos ya asignados
                 var reclamosProductos = new List<ReclamosProductoSn>();
 
-                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie) in productosReclamados)
+                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado) in productosReclamados)
                 {
-                    _logger.LogInformation("Asignando técnico para producto ID: {ProductoId}", numeroSerieProductoId);
-
-                    var tecnicoAsignado = await AsignarTecnicoAsync(numeroSerieProductoId);
-
                     if (tecnicoAsignado == null)
                     {
-                        _logger.LogError("No se pudo asignar técnico para producto ID: {ProductoId}", numeroSerieProductoId);
+                        _logger.LogError("CRÍTICO: Técnico null encontrado para producto {ProductoId}", numeroSerieProductoId);
                         await transaction.RollbackAsync();
                         return new CrearReclamoResponse
                         {
                             Exito = false,
-                            Mensaje = "No se pudo asignar un técnico para uno de los productos."
+                            Mensaje = "Error crítico: Técnico no asignado para un producto."
                         };
                     }
 
-                    _logger.LogInformation("Técnico asignado: {TecnicoId} - {Nombre}",
-                        tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}");
+                    // Verificar certificación del técnico antes de asignar
+                    var tieneCertificacion = await _context.UsuariosCertificacionMarcas
+                        .AnyAsync(ucm => ucm.FkMarca == marcaId && ucm.FkTecnico == tecnicoAsignado.Id);
+
+                    if (!tieneCertificacion)
+                    {
+                        _logger.LogError("CRÍTICO: El técnico {TecnicoId} no está certificado para la marca {MarcaId}",
+                            tecnicoAsignado.Id, marcaId);
+                        await transaction.RollbackAsync();
+                        return new CrearReclamoResponse
+                        {
+                            Exito = false,
+                            Mensaje = "Error de certificación: Técnico asignado no tiene certificación válida."
+                        };
+                    }
 
                     var reclamoProducto = new ReclamosProductoSn
                     {
@@ -320,18 +377,17 @@ namespace Infrastructure.Services
                     reclamosProductos.Add(reclamoProducto);
                     _context.ReclamosProductoSns.Add(reclamoProducto);
 
-                    _logger.LogInformation("Producto {NumeroSerie} agregado al reclamo con técnico {TecnicoId}",
-                        numeroSerie, tecnicoAsignado.Id);
+                    _logger.LogInformation("Producto {NumeroSerie} agregado al reclamo con técnico {TecnicoId} ({Nombre}) certificado en marca {MarcaId}",
+                        numeroSerie, tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}", marcaId);
                 }
 
                 try
                 {
                     await _context.SaveChangesAsync();
-                    _logger.LogInformation("Todos los productos agregados al reclamo");
+                    _logger.LogInformation("Todos los productos agregados al reclamo con técnicos asignados");
                 }
                 catch (DbUpdateException dbEx)
                 {
-                    // Capturar la excepción interna específica de SQL
                     var innerException = dbEx.InnerException;
                     while (innerException != null)
                     {
@@ -347,30 +403,35 @@ namespace Infrastructure.Services
                     };
                 }
 
-                // 6. Generar PDF
-                _logger.LogInformation("Generando PDF para reclamo {ReclamoId}", reclamo.Id);
-                var pdfBase64 = await GenerarPdfAsync(reclamo.Id, codigoReclamo, cliente, productosReclamados);
+                // 7. Generar PDF REAL (no HTML)
+                _logger.LogInformation("Generando PDF REAL para reclamo {ReclamoId}", reclamo.Id);
+                var pdfResult = await GenerarPdfRealAsync(reclamo.Id, codigoReclamo, cliente, productosReclamados);
 
-                if (string.IsNullOrEmpty(pdfBase64))
+                if (!pdfResult.exito)
                 {
-                    _logger.LogWarning("PDF generado vacío para reclamo {ReclamoId}", reclamo.Id);
-                }
-                else
-                {
-                    _logger.LogInformation("PDF generado correctamente para reclamo {ReclamoId}", reclamo.Id);
+                    _logger.LogError("Error al generar PDF para reclamo {ReclamoId}: {Error}", reclamo.Id, pdfResult.mensajeError);
+                    await transaction.RollbackAsync();
+                    return new CrearReclamoResponse
+                    {
+                        Exito = false,
+                        Mensaje = $"Error al generar el comprobante PDF: {pdfResult.mensajeError}"
+                    };
                 }
 
-                // 7. Commit de transacción
+                _logger.LogInformation("PDF generado correctamente y guardado en: {RutaPdf}", pdfResult.rutaArchivo);
+
+                // 8. Commit de transacción
                 await transaction.CommitAsync();
-                _logger.LogInformation("Transacción completada exitosamente");
+                _logger.LogInformation("Transacción completada exitosamente. Reclamo {ReclamoId} creado con {Cantidad} productos y técnicos asignados.",
+                    reclamo.Id, productosReclamados.Count);
 
                 return new CrearReclamoResponse
                 {
                     Exito = true,
-                    Mensaje = "Reclamo creado exitosamente.",
+                    Mensaje = "Reclamo creado exitosamente con asignación de técnicos verificada.",
                     ReclamoId = reclamo.Id,
                     CodigoReclamo = codigoReclamo,
-                    PdfBase64 = pdfBase64,
+                    PdfBase64 = pdfResult.pdfBase64,
                     PdfFileName = $"{codigoReclamo}.pdf"
                 };
             }
@@ -379,7 +440,6 @@ namespace Infrastructure.Services
                 await transaction.RollbackAsync();
                 _logger.LogError(ex, "Error al crear reclamo para el cliente con RUC: {Ruc}", request.RucCliente);
 
-                // Capturar y mostrar la excepción interna completa
                 var errorMessage = ex.Message;
                 var innerEx = ex.InnerException;
                 while (innerEx != null)
@@ -396,37 +456,43 @@ namespace Infrastructure.Services
             }
         }
 
-
-        private async Task<Usuario?> AsignarTecnicoAsync(int numeroSerieProductoId)
+        private async Task<Usuario?> AsignarTecnicoConValidacionAsync(int marcaId, int productoId)
         {
-            var producto = await _context.NumeroSerieProductos
-                .Include(nsp => nsp.FkProductoNavigation)
-                .FirstOrDefaultAsync(nsp => nsp.Id == numeroSerieProductoId);
+            _logger.LogInformation("Buscando técnicos certificados para marca {MarcaId}, producto {ProductoId}", marcaId, productoId);
 
-            if (producto == null) return null;
-
-            var marcaId = producto.FkProductoNavigation.FkMarca;
-
+            // Obtener técnicos certificados para la marca específica
             var tecnicosCertificados = await _context.UsuariosCertificacionMarcas
                 .Where(ucm => ucm.FkMarca == marcaId)
                 .Select(ucm => ucm.FkTecnicoNavigation)
                 .Where(t => t.Rol == "Tecnico")
                 .ToListAsync();
 
-            if (!tecnicosCertificados.Any()) return null;
+            if (!tecnicosCertificados.Any())
+            {
+                _logger.LogWarning("No hay técnicos certificados para la marca {MarcaId}", marcaId);
+                return null;
+            }
 
+            _logger.LogInformation("Encontrados {Cantidad} técnicos certificados para marca {MarcaId}",
+                tecnicosCertificados.Count, marcaId);
+
+            // Obtener carga de trabajo actual (reclamos pendientes) de cada técnico
             var cargaTrabajo = await _context.ReclamosProductoSns
                 .Where(rps => rps.FkTecnicoAsignado != null && rps.Estado == "Pendiente")
                 .GroupBy(rps => rps.FkTecnicoAsignado)
                 .Select(g => new { TecnicoId = g.Key, Carga = g.Count() })
                 .ToDictionaryAsync(x => x.TecnicoId, x => x.Carga);
 
+            // Asignar al técnico con menor carga
             Usuario? tecnicoAsignado = null;
             int minCarga = int.MaxValue;
 
             foreach (var tecnico in tecnicosCertificados)
             {
                 cargaTrabajo.TryGetValue(tecnico.Id, out int carga);
+                _logger.LogInformation("Técnico {TecnicoId} ({Nombre}) - Carga actual: {Carga}",
+                    tecnico.Id, $"{tecnico.Nombres} {tecnico.Apellidos}", carga);
+
                 if (carga < minCarga)
                 {
                     minCarga = carga;
@@ -434,15 +500,24 @@ namespace Infrastructure.Services
                 }
             }
 
+            if (tecnicoAsignado != null)
+            {
+                _logger.LogInformation("Técnico asignado: {TecnicoId} ({Nombre}) con carga {Carga}",
+                    tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}", minCarga);
+            }
+
             return tecnicoAsignado;
         }
 
-        private async Task<string> GenerarPdfAsync(int reclamoId, string codigoReclamo, Usuario cliente, List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie)> productos)
+        private async Task<(bool exito, string pdfBase64, string rutaArchivo, string mensajeError)> GenerarPdfRealAsync(
+            int reclamoId, string codigoReclamo, Usuario cliente,
+            List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario? tecnicoAsignado)> productos)
         {
             try
             {
+                // Obtener detalles completos de los productos
                 var productosDetalle = new List<dynamic>();
-                foreach (var (id, forma, numeroSerie) in productos)
+                foreach (var (id, forma, numeroSerie, marcaId, tecnico) in productos)
                 {
                     var producto = await _context.NumeroSerieProductos
                         .Include(nsp => nsp.FkProductoNavigation)
@@ -458,95 +533,125 @@ namespace Infrastructure.Services
                             Modelo = producto.FkProductoNavigation?.Modelo,
                             Especificacion = producto.FkProductoNavigation?.Especificacion,
                             FormaCompensacion = forma,
-                            Precio = producto.FkProductoNavigation?.Precio
+                            Precio = producto.FkProductoNavigation?.Precio,
+                            TecnicoAsignado = tecnico != null ? $"{tecnico.Nombres} {tecnico.Apellidos}" : "No asignado",
+                            TecnicoId = tecnico?.Id
                         });
                     }
                 }
 
-                var pdfContent = $@"
-                <html>
-                <head>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; margin: 40px; }}
-                        .header {{ text-align: center; margin-bottom: 30px; }}
-                        .title {{ font-size: 24px; font-weight: bold; color: #333; }}
-                        .subtitle {{ font-size: 18px; color: #666; margin-top: 10px; }}
-                        .section {{ margin: 20px 0; }}
-                        .section-title {{ font-size: 16px; font-weight: bold; color: #333; border-bottom: 2px solid #0056b3; padding-bottom: 5px; }}
-                        .info {{ margin: 10px 0; }}
-                        .info-label {{ font-weight: bold; color: #555; }}
-                        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-                        th {{ background-color: #f8f9fa; text-align: left; padding: 10px; border: 1px solid #dee2e6; }}
-                        td {{ padding: 10px; border: 1px solid #dee2e6; }}
-                        .footer {{ margin-top: 40px; text-align: center; color: #6c757d; font-size: 12px; }}
-                    </style>
-                </head>
-                <body>
-                    <div class='header'>
-                        <div class='title'>COMPROBANTE DE RECLAMO</div>
-                        <div class='subtitle'>Código: {codigoReclamo}</div>
-                    </div>
+                // Generar PDF con QuestPDF
+                var pdfBytes = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+                        page.PageColor(Colors.White);
+                        page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
 
-                    <div class='section'>
-                        <div class='section-title'>Información del Cliente</div>
-                        <div class='info'><span class='info-label'>Razón Social:</span> {cliente.Nombres} {cliente.Apellidos}</div>
-                        <div class='info'><span class='info-label'>RUC:</span> {cliente.Ruc}</div>
-                        <div class='info'><span class='info-label'>Fecha de Reclamo:</span> {DateTime.Now:dd/MM/yyyy HH:mm}</div>
-                    </div>
+                        page.Header()
+                            .AlignCenter()
+                            .Text("COMPROBANTE DE RECLAMO")
+                            .SemiBold().FontSize(20).FontColor(Colors.Blue.Darken3);
 
-                    <div class='section'>
-                        <div class='section-title'>Productos Reclamados</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>N° Serie</th>
-                                    <th>Marca</th>
-                                    <th>Modelo</th>
-                                    <th>Especificación</th>
-                                    <th>Forma de Compensación</th>
-                                    <th>Precio</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {string.Join("", productosDetalle.Select(p => $@"
-                                <tr>
-                                    <td>{p.NumeroSerie}</td>
-                                    <td>{p.Marca}</td>
-                                    <td>{p.Modelo}</td>
-                                    <td>{p.Especificacion}</td>
-                                    <td>{p.FormaCompensacion}</td>
-                                    <td>${p.Precio:N2}</td>
-                                </tr>
-                                "))}
-                            </tbody>
-                        </table>
-                    </div>
+                        page.Content()
+                            .PaddingVertical(1, Unit.Centimetre)
+                            .Column(x =>
+                            {
+                                x.Spacing(10);
 
-                    <div class='section'>
-                        <div class='section-title'>Observaciones</div>
-                        <div class='info'>
-                            <p>1. Este comprobante debe ser presentado para cualquier consulta sobre el estado del reclamo.</p>
-                            <p>2. Los productos serán revisados por técnicos certificados en las marcas correspondientes.</p>
-                            <p>3. El tiempo de resolución dependerá de la complejidad del caso y la disponibilidad de repuestos.</p>
-                            <p>4. Para más información, contactar al departamento de soporte técnico.</p>
-                        </div>
-                    </div>
+                                // Información del reclamo
+                                x.Item().Text($"Código de Reclamo: {codigoReclamo}").SemiBold();
+                                x.Item().Text($"Fecha de Creación: {DateTime.Now:dd/MM/yyyy HH:mm}");
+                                x.Item().Text($"Reclamo ID: {reclamoId}");
 
-                    <div class='footer'>
-                        <p>Sistema de Gestión de Reclamos - Versión 1.0</p>
-                        <p>Documento generado automáticamente el {DateTime.Now:dd/MM/yyyy HH:mm:ss}</p>
-                    </div>
-                </body>
-                </html>";
+                                // Información del cliente
+                                x.Item().PaddingTop(10).Text("INFORMACIÓN DEL CLIENTE").SemiBold().FontSize(14);
+                                x.Item().Text($"Razón Social: {cliente.Nombres} {cliente.Apellidos}");
+                                x.Item().Text($"RUC: {cliente.Ruc}");
+                                x.Item().Text($"Teléfono: {cliente.Celular}");
 
-                // En una implementación real, usaríamos una librería como iTextSharp o QuestPDF
-                // Por ahora, devolvemos HTML que puede ser convertido a PDF en el frontend
-                return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(pdfContent));
+                                // Productos reclamados
+                                x.Item().PaddingTop(15).Text("PRODUCTOS RECLAMADOS").SemiBold().FontSize(14);
+                                x.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.ConstantColumn(100); // N° Serie
+                                        columns.RelativeColumn();    // Producto
+                                        columns.ConstantColumn(80);  // Precio
+                                        columns.ConstantColumn(100); // Compensación
+                                        columns.ConstantColumn(120); // Técnico Asignado
+                                    });
+
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(5).Text("N° Serie");
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(5).Text("Producto");
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(5).Text("Precio");
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(5).Text("Compensación");
+                                        header.Cell().Background(Colors.Grey.Lighten3).Padding(5).Text("Técnico");
+                                    });
+
+                                    foreach (var p in productosDetalle)
+                                    {
+                                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text($"{p.NumeroSerie}");
+                                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text($"{p.Marca} {p.Modelo}\n{p.Especificacion}");
+                                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text($"${p.Precio:N2}");
+                                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text($"{p.FormaCompensacion}");
+                                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text($"{p.TecnicoAsignado}");
+                                    }
+                                });
+
+                                // Resumen
+                                x.Item().PaddingTop(15).Text("RESUMEN").SemiBold().FontSize(14);
+                                x.Item().Text($"Total de productos: {productosDetalle.Count}");
+                                x.Item().Text($"Técnicos asignados: {productosDetalle.Count(p => p.TecnicoId != null)} de {productosDetalle.Count}");
+
+                                // Observaciones
+                                x.Item().PaddingTop(15).Text("OBSERVACIONES").SemiBold().FontSize(14);
+                                x.Item().Text("1. Este comprobante debe ser presentado para cualquier consulta sobre el estado del reclamo.");
+                                x.Item().Text("2. Los productos serán revisados por técnicos certificados en las marcas correspondientes.");
+                                x.Item().Text("3. Cada producto tiene asignado un técnico específico según su marca.");
+                                x.Item().Text("4. El tiempo de resolución depende de la complejidad del caso.");
+                            });
+
+                        page.Footer()
+                            .AlignCenter()
+                            .Text(x =>
+                            {
+                                x.Span("Sistema de Gestión de Reclamos - Versión 1.0 | ");
+                                x.Span($"Generado el {DateTime.Now:dd/MM/yyyy HH:mm:ss}").Italic();
+                            });
+                    });
+                })
+                .GeneratePdf();
+
+                // Guardar PDF en la carpeta especificada
+                var pdfSettings = _configuration.GetSection("PdfSettings");
+                var basePath = pdfSettings["StoragePath"] ?? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "reclamos");
+
+                // Crear directorio si no existe
+                Directory.CreateDirectory(basePath);
+
+                var fileName = $"{codigoReclamo}.pdf";
+                var filePath = Path.Combine(basePath, fileName);
+
+                await File.WriteAllBytesAsync(filePath, pdfBytes);
+                _logger.LogInformation("PDF guardado en: {FilePath}", filePath);
+
+                // Convertir a base64 para enviar al frontend
+                var pdfBase64 = Convert.ToBase64String(pdfBytes);
+
+                return (true, pdfBase64, filePath, string.Empty);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al generar PDF para reclamo {ReclamoId}", reclamoId);
-                return string.Empty;
+                _logger.LogError(ex, "Error al generar PDF real para reclamo {ReclamoId}", reclamoId);
+                return (false, string.Empty, string.Empty, $"Error al generar PDF: {ex.Message}");
             }
         }
     }

@@ -57,8 +57,8 @@ builder.Services.AddCors(options =>
         builder =>
         {
             builder.WithOrigins("http://localhost:5173", "http://localhost:3000")
-                   .AllowAnyHeader()
-                   .AllowAnyMethod();
+                .AllowAnyHeader()
+                .AllowAnyMethod();
         });
 });
 
@@ -70,7 +70,6 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
-
 
 app.UseCors("AllowReactApp");
 app.UseAuthentication();
@@ -257,4 +256,5 @@ app.MapPost("/api/reclamos/crear", [Authorize(Roles = "Revisor")] async (CrearRe
     var response = await reclamoService.CrearReclamoAsync(request, revisorId);
     return response.Exito ? Results.Ok(response) : Results.BadRequest(response);
 });
+
 app.Run();
