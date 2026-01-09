@@ -1,5 +1,6 @@
 ﻿using Application.DTOs.Auth;
 using Infrastructure.Data;
+using Infrastructure.Interfaces;
 using Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

@@ -3,6 +3,7 @@ using Application.DTOs.Reclamo;
 using Application.DTOs.Tecnico;
 using Application.DTOs.User;
 using Infrastructure.Data;
+using Infrastructure.Interfaces;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;

@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Net.Http;
+using Infrastructure.Interfaces;
 
 namespace Infrastructure.Services
 {

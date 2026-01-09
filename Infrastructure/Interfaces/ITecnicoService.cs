@@ -1,6 +1,6 @@
 ﻿using Application.DTOs.Tecnico;
 
-namespace Infrastructure.Services
+namespace Infrastructure.Interfaces
 {
     public interface ITecnicoService
     {

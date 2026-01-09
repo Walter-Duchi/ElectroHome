@@ -1,6 +1,6 @@
 ﻿using Application.DTOs.Reclamo;
 
-namespace Infrastructure.Services
+namespace Infrastructure.Interfaces
 {
     public interface IReclamoService
     {

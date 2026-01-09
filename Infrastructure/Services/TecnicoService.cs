@@ -9,6 +9,7 @@ using Application.DTOs.Tecnico;
 using Infrastructure.Models;
 using System.IO;
 using Microsoft.Extensions.Configuration;
+using Infrastructure.Interfaces;
 
 namespace Infrastructure.Services
 {

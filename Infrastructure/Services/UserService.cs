@@ -1,5 +1,6 @@
 ﻿using Application.DTOs.User;
 using Infrastructure.Data;
+using Infrastructure.Interfaces;
 using Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
