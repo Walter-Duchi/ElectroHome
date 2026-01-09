@@ -3,12 +3,10 @@ import { GlobalStyles as MuiGlobalStyles } from '@mui/material';
 export const GlobalStyles = () => (
   <MuiGlobalStyles
     styles={{
-      // Normalización adicional para consistencia total
       'html, body, #root': {
         height: '100%',
         width: '100%',
       },
-      // Estilos para inputs de tipo number consistentes
       'input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button': {
         WebkitAppearance: 'none',
         margin: 0,
@@ -19,11 +17,9 @@ export const GlobalStyles = () => (
       // Estilos para selección de texto consistente
       '::selection': {
         backgroundColor: 'rgba(0, 86, 179, 0.2)',
-        color: '#212529',
       },
       '::-moz-selection': {
         backgroundColor: 'rgba(0, 86, 179, 0.2)',
-        color: '#212529',
       },
       // Animaciones globales
       '@keyframes fadeIn': {
@@ -52,6 +48,14 @@ export const GlobalStyles = () => (
         outline: '2px solid #0056b3',
         outlineOffset: '2px',
         borderRadius: '4px',
+      },
+      // Estilos para transiciones suaves
+      '*': {
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+      },
+      // Excepciones para elementos que no deben tener transición
+      'canvas, img, svg, video, iframe': {
+        transition: 'none !important',
       },
       // Estilos para impresión
       '@media print': {

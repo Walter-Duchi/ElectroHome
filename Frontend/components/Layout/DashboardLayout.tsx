@@ -35,6 +35,7 @@ import {
 import { useAuth } from '../../services/authContext';
 import { userService } from '../../services/userService';
 import CreateUserModal from '../Navbar/CreateUserModal';
+import { ThemeSelector } from '../ThemeSelector/ThemeSelector';
 
 const drawerWidth = 280;
 
@@ -257,13 +258,19 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           </ListItemIcon>
           <ListItemText>Mi Perfil</ListItemText>
         </MenuItem>
+        
+        {/* Selector de tema como ítem de menú */}
+        <ThemeSelector variant="menu-item" />
+        
         <MenuItem onClick={handleMenuClose}>
           <ListItemIcon>
             <Settings fontSize="small" />
           </ListItemIcon>
           <ListItemText>Configuración</ListItemText>
         </MenuItem>
+        
         <Divider />
+        
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>
             <ExitToApp fontSize="small" />

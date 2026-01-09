@@ -1,8 +1,9 @@
 import { createTheme, Theme } from '@mui/material/styles';
 import { esES } from '@mui/material/locale';
 
-// Paleta de colores corporativa optimizada
-const corporateColors = {
+// Paleta de colores corporativa optimizada - MODO CLARO
+const corporateColorsLight = {
+  mode: 'light' as const,
   primary: {
     main: '#0056b3',
     light: '#4d84d6',
@@ -63,6 +64,72 @@ const corporateColors = {
     selected: 'rgba(0, 86, 179, 0.08)',
     disabled: '#adb5bd',
     disabledBackground: 'rgba(0, 0, 0, 0.12)',
+  },
+};
+
+// Paleta de colores corporativa optimizada - MODO OSCURO
+const corporateColorsDark = {
+  mode: 'dark' as const,
+  primary: {
+    main: '#4d84d6',
+    light: '#7ab2ff',
+    dark: '#0056b3',
+    contrastText: '#ffffff',
+  },
+  secondary: {
+    main: '#5fd85f',
+    light: '#8eff8e',
+    dark: '#28a745',
+    contrastText: '#ffffff',
+  },
+  error: {
+    main: '#ff6b6b',
+    light: '#ff9e9e',
+    dark: '#dc3545',
+  },
+  warning: {
+    main: '#ffd54f',
+    light: '#ffe082',
+    dark: '#ffc107',
+  },
+  info: {
+    main: '#4fc3f7',
+    light: '#8bf6ff',
+    dark: '#17a2b8',
+  },
+  success: {
+    main: '#81c784',
+    light: '#a5d6a7',
+    dark: '#28a745',
+  },
+  background: {
+    default: '#121416',
+    paper: '#1e2125',
+  },
+  text: {
+    primary: '#e9ecef',
+    secondary: '#adb5bd',
+    disabled: '#6c757d',
+  },
+  grey: {
+    50: '#121416',
+    100: '#1e2125',
+    200: '#2a2e33',
+    300: '#3a3f45',
+    400: '#495057',
+    500: '#6c757d',
+    600: '#adb5bd',
+    700: '#ced4da',
+    800: '#e9ecef',
+    900: '#ffffff',
+  },
+  divider: 'rgba(255, 255, 255, 0.12)',
+  action: {
+    active: '#e9ecef',
+    hover: 'rgba(255, 255, 255, 0.08)',
+    selected: 'rgba(255, 255, 255, 0.16)',
+    disabled: 'rgba(255, 255, 255, 0.3)',
+    disabledBackground: 'rgba(255, 255, 255, 0.12)',
   },
 };
 
@@ -156,11 +223,10 @@ const corporateTypography = {
   },
 };
 
-// Configuración de componentes optimizada para consistencia entre navegadores
+// Configuración de componentes (compartida entre modos)
 const components = {
   MuiCssBaseline: {
     styleOverrides: {
-      // Normalización para consistencia entre navegadores
       html: {
         WebkitFontSmoothing: 'antialiased',
         MozOsxFontSmoothing: 'grayscale',
@@ -176,56 +242,41 @@ const components = {
       },
       body: {
         margin: 0,
-        backgroundColor: '#f8f9fa',
         fontFamily: corporateTypography.fontFamily,
         fontSize: '14px',
         lineHeight: '1.6',
-        color: corporateColors.text.primary,
         overflowX: 'hidden',
+        transition: 'background-color 0.3s ease, color 0.3s ease',
       },
       '#root': {
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
       },
-      // Estilos consistentes para enlaces
       a: {
-        color: corporateColors.primary.main,
         textDecoration: 'none',
         '&:hover': {
           textDecoration: 'underline',
         },
       },
-      // Estilos para imágenes responsivas
       img: {
         maxWidth: '100%',
         height: 'auto',
         display: 'block',
       },
-      // Normalización de formularios
       'input, button, textarea, select': {
         fontFamily: 'inherit',
         fontSize: 'inherit',
         lineHeight: 'inherit',
       },
-      // Scrollbar consistente
       '::-webkit-scrollbar': {
         width: '10px',
         height: '10px',
       },
-      '::-webkit-scrollbar-track': {
-        background: corporateColors.grey[100],
-      },
       '::-webkit-scrollbar-thumb': {
-        background: corporateColors.grey[400],
         borderRadius: '5px',
-        '&:hover': {
-          background: corporateColors.grey[500],
-        },
       },
-      // Para Firefox
       scrollbarWidth: 'thin',
-      scrollbarColor: `${corporateColors.grey[400]} ${corporateColors.grey[100]}`,
     },
   },
   MuiButton: {
@@ -247,24 +298,6 @@ const components = {
         },
         '&:active': {
           transform: 'translateY(0)',
-        },
-      },
-      containedPrimary: {
-        background: `linear-gradient(135deg, ${corporateColors.primary.main} 0%, ${corporateColors.primary.dark} 100%)`,
-        '&:hover': {
-          background: `linear-gradient(135deg, ${corporateColors.primary.light} 0%, ${corporateColors.primary.main} 100%)`,
-        },
-      },
-      containedSecondary: {
-        background: `linear-gradient(135deg, ${corporateColors.secondary.main} 0%, ${corporateColors.secondary.dark} 100%)`,
-        '&:hover': {
-          background: `linear-gradient(135deg, ${corporateColors.secondary.light} 0%, ${corporateColors.secondary.main} 100%)`,
-        },
-      },
-      outlined: {
-        borderWidth: '2px',
-        '&:hover': {
-          borderWidth: '2px',
         },
       },
       sizeSmall: {
@@ -291,11 +324,9 @@ const components = {
           borderRadius: '8px',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: corporateColors.primary.light,
             borderWidth: '2px',
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: corporateColors.primary.main,
             borderWidth: '2px',
           },
         },
@@ -308,7 +339,7 @@ const components = {
         borderRadius: '12px',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        border: `1px solid ${corporateColors.divider}`,
+        border: '1px solid',
         overflow: 'hidden',
         '&:hover': {
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
@@ -326,9 +357,6 @@ const components = {
         backgroundImage: 'none',
         borderRadius: '12px',
       },
-      outlined: {
-        border: `1px solid ${corporateColors.divider}`,
-      },
     },
   },
   MuiAppBar: {
@@ -338,18 +366,8 @@ const components = {
     },
     styleOverrides: {
       root: {
-        backgroundColor: '#ffffff',
-        borderBottom: `1px solid ${corporateColors.divider}`,
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
-      },
-    },
-  },
-  MuiDrawer: {
-    styleOverrides: {
-      paper: {
-        borderRight: `1px solid ${corporateColors.divider}`,
-        boxShadow: '2px 0 24px rgba(0, 0, 0, 0.08)',
       },
     },
   },
@@ -379,20 +397,8 @@ const components = {
       paper: {
         borderRadius: '8px',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-        border: `1px solid ${corporateColors.divider}`,
+        border: '1px solid',
         marginTop: '8px',
-      },
-    },
-  },
-  MuiLinearProgress: {
-    styleOverrides: {
-      root: {
-        borderRadius: '3px',
-        height: '6px',
-        backgroundColor: corporateColors.grey[200],
-      },
-      bar: {
-        borderRadius: '3px',
       },
     },
   },
@@ -406,105 +412,9 @@ const components = {
       },
     },
   },
-  MuiAvatar: {
-    styleOverrides: {
-      root: {
-        width: '40px',
-        height: '40px',
-        fontSize: '1rem',
-      },
-    },
-  },
-  MuiDivider: {
-    styleOverrides: {
-      root: {
-        borderColor: corporateColors.divider,
-      },
-    },
-  },
-  MuiListItem: {
-    styleOverrides: {
-      root: {
-        borderRadius: '8px',
-        margin: '2px 0',
-        '&:hover': {
-          backgroundColor: corporateColors.action.hover,
-        },
-        '&.Mui-selected': {
-          backgroundColor: corporateColors.action.selected,
-          '&:hover': {
-            backgroundColor: corporateColors.action.selected,
-          },
-        },
-      },
-    },
-  },
-  MuiTableCell: {
-    styleOverrides: {
-      root: {
-        borderBottom: `1px solid ${corporateColors.divider}`,
-        padding: '16px',
-      },
-      head: {
-        backgroundColor: corporateColors.grey[50],
-        fontWeight: 600,
-        color: corporateColors.text.primary,
-      },
-    },
-  },
-  MuiTableRow: {
-    styleOverrides: {
-      root: {
-        '&:hover': {
-          backgroundColor: corporateColors.action.hover,
-        },
-        '&.Mui-selected': {
-          backgroundColor: corporateColors.action.selected,
-        },
-      },
-    },
-  },
-  MuiBadge: {
-    styleOverrides: {
-      badge: {
-        fontWeight: 600,
-        minWidth: '20px',
-        height: '20px',
-      },
-    },
-  },
-  MuiStepper: {
-    styleOverrides: {
-      root: {
-        padding: '24px 0',
-      },
-    },
-  },
-  MuiStepIcon: {
-    styleOverrides: {
-      root: {
-        '&.Mui-completed': {
-          color: corporateColors.success.main,
-        },
-        '&.Mui-active': {
-          color: corporateColors.primary.main,
-        },
-      },
-    },
-  },
-  MuiSkeleton: {
-    defaultProps: {
-      animation: 'wave',
-    },
-    styleOverrides: {
-      root: {
-        backgroundColor: corporateColors.grey[200],
-      },
-    },
-  },
 };
 
-// Configuración de breakpoints para responsividad consistente
+// Configuración de breakpoints
 const breakpoints = {
   values: {
     xs: 0,
@@ -515,8 +425,8 @@ const breakpoints = {
   },
 };
 
-// Configuración de sombras consistentes
-const shadows = [
+// Configuración de sombras para modo claro
+const shadowsLight = [
   'none',
   '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
   '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
@@ -527,14 +437,48 @@ const shadows = [
   ...Array(19).fill('none'),
 ];
 
-// Crear tema corporativo principal
+// Configuración de sombras para modo oscuro
+const shadowsDark = [
+  'none',
+  '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
+  '0 3px 6px rgba(0,0,0,0.4), 0 3px 6px rgba(0,0,0,0.5)',
+  '0 10px 20px rgba(0,0,0,0.3), 0 6px 6px rgba(0,0,0,0.2)',
+  '0 14px 28px rgba(0,0,0,0.35), 0 10px 10px rgba(0,0,0,0.25)',
+  '0 19px 38px rgba(0,0,0,0.4), 0 15px 12px rgba(0,0,0,0.3)',
+  '0 24px 48px rgba(0,0,0,0.45), 0 20px 20px rgba(0,0,0,0.35)',
+  ...Array(19).fill('none'),
+];
+
+// Crear tema corporativo principal (MODO CLARO)
 export const corporateTheme: Theme = createTheme(
   {
-    palette: corporateColors,
+    palette: corporateColorsLight,
     typography: corporateTypography,
-    components,
+    components: {
+      ...components,
+      MuiCssBaseline: {
+        styleOverrides: {
+          ...components.MuiCssBaseline.styleOverrides,
+          body: {
+            ...components.MuiCssBaseline.styleOverrides.body,
+            backgroundColor: corporateColorsLight.background.default,
+            color: corporateColorsLight.text.primary,
+          },
+          '::-webkit-scrollbar-track': {
+            background: corporateColorsLight.grey[100],
+          },
+          '::-webkit-scrollbar-thumb': {
+            background: corporateColorsLight.grey[400],
+            '&:hover': {
+              background: corporateColorsLight.grey[500],
+            },
+          },
+          scrollbarColor: `${corporateColorsLight.grey[400]} ${corporateColorsLight.grey[100]}`,
+        },
+      },
+    },
     breakpoints,
-    shadows,
+    shadows: shadowsLight,
     shape: {
       borderRadius: 8,
     },
@@ -569,50 +513,50 @@ export const corporateTheme: Theme = createTheme(
   esES
 );
 
-// Tema oscuro corporativo
+// Crear tema oscuro corporativo
 export const darkTheme: Theme = createTheme(
   {
-    palette: {
-      mode: 'dark',
-      primary: corporateColors.primary,
-      secondary: corporateColors.secondary,
-      background: {
-        default: '#121416',
-        paper: '#1e2125',
-      },
-      text: {
-        primary: '#e9ecef',
-        secondary: '#adb5bd',
-        disabled: '#6c757d',
-      },
-      divider: 'rgba(255, 255, 255, 0.12)',
-      action: {
-        active: '#e9ecef',
-        hover: 'rgba(255, 255, 255, 0.08)',
-        selected: 'rgba(255, 255, 255, 0.16)',
-        disabled: 'rgba(255, 255, 255, 0.3)',
-        disabledBackground: 'rgba(255, 255, 255, 0.12)',
+    palette: corporateColorsDark,
+    typography: corporateTypography,
+    components: {
+      ...components,
+      MuiCssBaseline: {
+        styleOverrides: {
+          ...components.MuiCssBaseline.styleOverrides,
+          body: {
+            ...components.MuiCssBaseline.styleOverrides.body,
+            backgroundColor: corporateColorsDark.background.default,
+            color: corporateColorsDark.text.primary,
+          },
+          '::-webkit-scrollbar-track': {
+            background: corporateColorsDark.grey[100],
+          },
+          '::-webkit-scrollbar-thumb': {
+            background: corporateColorsDark.grey[400],
+            '&:hover': {
+              background: corporateColorsDark.grey[500],
+            },
+          },
+          scrollbarColor: `${corporateColorsDark.grey[400]} ${corporateColorsDark.grey[100]}`,
+        },
       },
     },
-    typography: corporateTypography,
-    components,
     breakpoints,
-    shadows: [
-      'none',
-      '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
-      '0 3px 6px rgba(0,0,0,0.4), 0 3px 6px rgba(0,0,0,0.5)',
-      '0 10px 20px rgba(0,0,0,0.3), 0 6px 6px rgba(0,0,0,0.2)',
-      '0 14px 28px rgba(0,0,0,0.35), 0 10px 10px rgba(0,0,0,0.25)',
-      '0 19px 38px rgba(0,0,0,0.4), 0 15px 12px rgba(0,0,0,0.3)',
-      '0 24px 48px rgba(0,0,0,0.45), 0 20px 20px rgba(0,0,0,0.35)',
-      ...Array(19).fill('none'),
-    ],
+    shadows: shadowsDark,
     shape: {
       borderRadius: 8,
     },
   },
   esES
 );
+
+// Función para obtener el tema basado en el modo
+export const getTheme = (mode: 'light' | 'dark') => {
+  return mode === 'light' ? corporateTheme : darkTheme;
+};
+
+// Tipos de modo
+export type ThemeMode = 'light' | 'dark' | 'auto';
 
 // Función de utilidad para usar el tema en componentes
 export const themeUtils = {
@@ -628,7 +572,8 @@ export const themeUtils = {
     };
     return sizes[size];
   },
-  getBoxShadow: (level: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 1) => shadows[level],
+  getBoxShadow: (level: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 1, mode: 'light' | 'dark' = 'light') => 
+    mode === 'light' ? shadowsLight[level] : shadowsDark[level],
 };
 
 export default corporateTheme;

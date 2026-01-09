@@ -13,6 +13,7 @@ import {
   Divider,
   InputAdornment,
   IconButton,
+  Stack,
 } from '@mui/material';
 import {
   Lock as LockIcon,
@@ -23,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
 import { Link as RouterLink } from 'react-router-dom';
+import ThemeSelector from '../ThemeSelector/ThemeSelector';
 
 const LoginForm: React.FC = () => {
   const [correo, setCorreo] = useState('');
@@ -74,8 +76,14 @@ const LoginForm: React.FC = () => {
             borderRadius: 4,
             border: '1px solid',
             borderColor: 'divider',
+            position: 'relative',
           }}
         >
+          {/* Selector de tema en la esquina superior derecha */}
+          <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
+            <ThemeSelector showLabel={false} />
+          </Box>
+
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Box
               sx={{
