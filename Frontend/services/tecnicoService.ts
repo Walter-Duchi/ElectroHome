@@ -7,13 +7,37 @@ import {
 } from '../src/types/tecnico';
 
 export const tecnicoService = {
-    // Obtener todos los productos asignados al técnico
     async obtenerProductosAsignados(): Promise<TecnicoProducto[]> {
         try {
+            console.log('🔍 [tecnicoService] Obteniendo productos asignados...');
+            console.log('📡 URL:', `${api.defaults.baseURL}/tecnico/productos`);
+            
+            const token = localStorage.getItem('token');
+            console.log('🔑 Token disponible:', token ? 'Sí' : 'No');
+            if (token) {
+                console.log('🔑 Token:', token.substring(0, 50) + '...');
+            }
+            
             const response = await api.get<TecnicoProducto[]>('/tecnico/productos');
+            
+            console.log('✅ [tecnicoService] Productos obtenidos:', response.data);
+            console.log('📊 Cantidad de productos:', response.data.length);
+            
             return response.data;
         } catch (error: any) {
-            console.error('Error obteniendo productos del técnico:', error);
+            console.error('❌ [tecnicoService] Error obteniendo productos:', error);
+            
+            if (error.response) {
+                console.error('📡 Detalles de la respuesta:', {
+                    status: error.response.status,
+                    statusText: error.response.statusText,
+                    headers: error.response.headers,
+                    data: error.response.data
+                });
+            } else if (error.request) {
+                console.error('📡 No se recibió respuesta:', error.request);
+            }
+            
             throw new Error(error.response?.data?.message || 'Error al obtener productos');
         }
     },

@@ -9,9 +9,6 @@ using Application.DTOs.Tecnico;
 using Infrastructure.Models;
 using System.IO;
 using Microsoft.Extensions.Configuration;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 
 namespace Infrastructure.Services
 {
@@ -26,24 +23,52 @@ namespace Infrastructure.Services
             _context = context;
             _logger = logger;
             _configuration = configuration;
-            QuestPDF.Settings.License = LicenseType.Community;
         }
 
         public async Task<List<TecnicoProductosResponse>> ObtenerProductosAsignadosAsync(int tecnicoId)
         {
+            using var activity = new System.Diagnostics.Activity("ObtenerProductosAsignados");
+            activity.Start();
+            
             try
             {
-                _logger.LogInformation("Obteniendo productos asignados para técnico ID: {TecnicoId}", tecnicoId);
+                _logger.LogInformation("=== INICIO ObtenerProductosAsignadosAsync ===");
+                _logger.LogInformation("Técnico ID: {TecnicoId}", tecnicoId);
 
-                var productos = await _context.ReclamosProductoSns
+                // Verificar si el técnico existe
+                var tecnicoExiste = await _context.Usuarios.AnyAsync(u => u.Id == tecnicoId && u.Rol == "Tecnico");
+                _logger.LogInformation("Técnico existe en BD: {Existe}", tecnicoExiste);
+
+                if (!tecnicoExiste)
+                {
+                    _logger.LogWarning("Técnico ID {TecnicoId} no encontrado o no es técnico", tecnicoId);
+                    return new List<TecnicoProductosResponse>();
+                }
+
+                // Query detallada con logging
+                var query = _context.ReclamosProductoSns
                     .Include(rps => rps.FkNumeroSerieProductosNavigation)
                         .ThenInclude(nsp => nsp.FkProductoNavigation)
                             .ThenInclude(p => p.FkMarcaNavigation)
                     .Include(rps => rps.FkReclamosNavigation)
                         .ThenInclude(r => r.FkEmpresaClienteNavigation)
                     .Where(rps => rps.FkTecnicoAsignado == tecnicoId &&
-                                 (rps.Estado == "Pendiente" || rps.Estado == "En Revision"))
-                    .OrderBy(rps => rps.FechaReclamoClienteFinal) // Orden por fecha más antigua primero
+                                 (rps.Estado == "Pendiente" || rps.Estado == "En Revision"));
+
+                try
+                {
+                    _logger.LogInformation("Query SQL generada: {Query}", query.ToQueryString());
+                }
+                catch
+                {
+                    _logger.LogDebug("No se pudo obtener QueryString (posible provider no compatible en tiempo de ejecución).");
+                }
+
+                _logger.LogInformation("Total de registros encontrados antes de selección: {Count}", 
+                    await query.CountAsync());
+
+                var productos = await query
+                    .OrderBy(rps => rps.FechaReclamoClienteFinal)
                     .Select(rps => new TecnicoProductosResponse
                     {
                         Id = rps.Id,
@@ -65,13 +90,51 @@ namespace Infrastructure.Services
                     })
                     .ToListAsync();
 
-                _logger.LogInformation("Encontrados {Cantidad} productos para técnico ID: {TecnicoId}", productos.Count, tecnicoId);
+                _logger.LogInformation("Productos obtenidos: {Cantidad}", productos.Count);
+                
+                if (productos.Count > 0)
+                {
+                    _logger.LogInformation("Detalle de productos:");
+                    foreach (var p in productos)
+                    {
+                        _logger.LogInformation("  - ID: {Id}, Serie: {Serie}, Estado: {Estado}, Marca: {Marca}", 
+                            p.Id, p.NumeroSerie, p.Estado, p.Marca);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("No se encontraron productos para el técnico ID: {TecnicoId}", tecnicoId);
+                    
+                    // Log adicional para debug: ¿Qué productos hay en la BD?
+                    var todosProductos = await _context.ReclamosProductoSns
+                        .Where(rps => rps.FkTecnicoAsignado != null)
+                        .Select(rps => new 
+                        { 
+                            rps.Id, 
+                            rps.FkTecnicoAsignado, 
+                            rps.Estado,
+                            NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie
+                        })
+                        .ToListAsync();
+                        
+                    _logger.LogInformation("Productos con técnico asignado en BD (total): {Count}", todosProductos.Count);
+                    foreach (var p in todosProductos)
+                    {
+                        _logger.LogInformation("  - ID: {Id}, Técnico: {Tecnico}, Estado: {Estado}, Serie: {Serie}", 
+                            p.Id, p.FkTecnicoAsignado, p.Estado, p.NumeroSerie);
+                    }
+                }
+
+                _logger.LogInformation("=== FIN ObtenerProductosAsignadosAsync ===");
                 return productos;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener productos asignados para técnico ID: {TecnicoId}", tecnicoId);
-                throw;
+                _logger.LogError(ex, "ERROR en ObtenerProductosAsignadosAsync para técnico ID: {TecnicoId}", tecnicoId);
+                _logger.LogError("Stack Trace: {StackTrace}", ex.StackTrace);
+                _logger.LogError("Inner Exception: {InnerException}", ex.InnerException?.Message);
+                
+                throw new Exception($"Error al obtener productos asignados: {ex.Message}", ex);
             }
         }
 
@@ -305,10 +368,21 @@ namespace Infrastructure.Services
         private bool CalcularGarantiaValida(DateTime? fechaVenta, int diasGarantia)
         {
             if (!fechaVenta.HasValue || diasGarantia <= 0)
+            {
+                _logger.LogDebug("Garantía no válida: FechaVenta={FechaVenta}, DiasGarantia={DiasGarantia}", 
+                    fechaVenta, diasGarantia);
                 return false;
+            }
 
             var fechaLimite = fechaVenta.Value.AddDays(diasGarantia);
-            return DateTime.Now <= fechaLimite;
+            var hoy = DateTime.Now;
+            var valida = hoy <= fechaLimite;
+            
+            _logger.LogDebug("Cálculo garantía: FechaVenta={FechaVenta}, Dias={Dias}, Limite={Limite}, Hoy={Hoy}, Valida={Valida}",
+                fechaVenta.Value.ToString("yyyy-MM-dd"), diasGarantia, fechaLimite.ToString("yyyy-MM-dd"), 
+                hoy.ToString("yyyy-MM-dd"), valida);
+                
+            return valida;
         }
 
         private async Task<string> GuardarPdfAsync(string pdfBase64, string fileName, int reclamoProductoSnId)
