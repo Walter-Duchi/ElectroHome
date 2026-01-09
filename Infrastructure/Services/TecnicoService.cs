@@ -25,6 +25,18 @@ namespace Infrastructure.Services
             _configuration = configuration;
         }
 
+        private static bool CalcularGarantiaValida(DateTime? fechaVenta, int diasGarantia)
+        {
+            if (!fechaVenta.HasValue || diasGarantia <= 0)
+            {
+                return false;
+            }
+
+            var fechaLimite = fechaVenta.Value.AddDays(diasGarantia);
+            var hoy = DateTime.Now;
+            return hoy <= fechaLimite;
+        }
+
         public async Task<List<TecnicoProductosResponse>> ObtenerProductosAsignadosAsync(int tecnicoId)
         {
             using var activity = new System.Diagnostics.Activity("ObtenerProductosAsignados");
@@ -61,15 +73,16 @@ namespace Infrastructure.Services
                 }
                 catch
                 {
-                    _logger.LogDebug("No se pudo obtener QueryString (posible provider no compatible en tiempo de ejecución).");
+                    _logger.LogDebug("No se pudo obtener QueryString.");
                 }
 
                 _logger.LogInformation("Total de registros encontrados antes de selección: {Count}", 
                     await query.CountAsync());
 
-                var productos = await query
+                // Primero obtener datos básicos sin el cálculo complejo
+                var queryResult = await query
                     .OrderBy(rps => rps.FechaReclamoClienteFinal)
-                    .Select(rps => new TecnicoProductosResponse
+                    .Select(rps => new 
                     {
                         Id = rps.Id,
                         NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie,
@@ -83,12 +96,30 @@ namespace Infrastructure.Services
                         Precio = rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.Precio,
                         ClienteNombre = $"{rps.FkReclamosNavigation.FkEmpresaClienteNavigation.Nombres} {rps.FkReclamosNavigation.FkEmpresaClienteNavigation.Apellidos}",
                         ClienteRuc = rps.FkReclamosNavigation.FkEmpresaClienteNavigation.Ruc,
-                        FechaVentaClienteFinal = rps.FechaVentaClienteFinal ?? DateTime.MinValue,
-                        DiasGarantia = rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.DiasGarantia,
-                        GarantiaValida = CalcularGarantiaValida(rps.FechaVentaClienteFinal,
-                            rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.DiasGarantia)
+                        FechaVentaClienteFinal = rps.FechaVentaClienteFinal,
+                        DiasGarantia = rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.DiasGarantia
                     })
                     .ToListAsync();
+
+                // Ahora calcular GarantiaValida en memoria
+                var productos = queryResult.Select(r => new TecnicoProductosResponse
+                {
+                    Id = r.Id,
+                    NumeroSerie = r.NumeroSerie,
+                    Marca = r.Marca,
+                    Modelo = r.Modelo,
+                    Especificacion = r.Especificacion,
+                    Estado = r.Estado,
+                    FechaReclamoClienteFinal = r.FechaReclamoClienteFinal,
+                    CodigoReclamo = r.CodigoReclamo,
+                    FormaCompensacion = r.FormaCompensacion,
+                    Precio = r.Precio,
+                    ClienteNombre = r.ClienteNombre,
+                    ClienteRuc = r.ClienteRuc,
+                    FechaVentaClienteFinal = r.FechaVentaClienteFinal ?? DateTime.MinValue,
+                    DiasGarantia = r.DiasGarantia,
+                    GarantiaValida = CalcularGarantiaValida(r.FechaVentaClienteFinal, r.DiasGarantia)
+                }).ToList();
 
                 _logger.LogInformation("Productos obtenidos: {Cantidad}", productos.Count);
                 
@@ -99,29 +130,6 @@ namespace Infrastructure.Services
                     {
                         _logger.LogInformation("  - ID: {Id}, Serie: {Serie}, Estado: {Estado}, Marca: {Marca}", 
                             p.Id, p.NumeroSerie, p.Estado, p.Marca);
-                    }
-                }
-                else
-                {
-                    _logger.LogInformation("No se encontraron productos para el técnico ID: {TecnicoId}", tecnicoId);
-                    
-                    // Log adicional para debug: ¿Qué productos hay en la BD?
-                    var todosProductos = await _context.ReclamosProductoSns
-                        .Where(rps => rps.FkTecnicoAsignado != null)
-                        .Select(rps => new 
-                        { 
-                            rps.Id, 
-                            rps.FkTecnicoAsignado, 
-                            rps.Estado,
-                            NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie
-                        })
-                        .ToListAsync();
-                        
-                    _logger.LogInformation("Productos con técnico asignado en BD (total): {Count}", todosProductos.Count);
-                    foreach (var p in todosProductos)
-                    {
-                        _logger.LogInformation("  - ID: {Id}, Técnico: {Tecnico}, Estado: {Estado}, Serie: {Serie}", 
-                            p.Id, p.FkTecnicoAsignado, p.Estado, p.NumeroSerie);
                     }
                 }
 
@@ -144,8 +152,7 @@ namespace Infrastructure.Services
             {
                 _logger.LogInformation("Obteniendo próximo producto para técnico ID: {TecnicoId}", tecnicoId);
 
-                // Obtener el producto más antiguo que esté pendiente
-                var producto = await _context.ReclamosProductoSns
+                var queryResult = await _context.ReclamosProductoSns
                     .Include(rps => rps.FkNumeroSerieProductosNavigation)
                         .ThenInclude(nsp => nsp.FkProductoNavigation)
                             .ThenInclude(p => p.FkMarcaNavigation)
@@ -154,7 +161,7 @@ namespace Infrastructure.Services
                     .Where(rps => rps.FkTecnicoAsignado == tecnicoId &&
                                  rps.Estado == "Pendiente")
                     .OrderBy(rps => rps.FechaReclamoClienteFinal)
-                    .Select(rps => new TecnicoProductosResponse
+                    .Select(rps => new 
                     {
                         Id = rps.Id,
                         NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie,
@@ -168,24 +175,38 @@ namespace Infrastructure.Services
                         Precio = rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.Precio,
                         ClienteNombre = $"{rps.FkReclamosNavigation.FkEmpresaClienteNavigation.Nombres} {rps.FkReclamosNavigation.FkEmpresaClienteNavigation.Apellidos}",
                         ClienteRuc = rps.FkReclamosNavigation.FkEmpresaClienteNavigation.Ruc,
-                        FechaVentaClienteFinal = rps.FechaVentaClienteFinal ?? DateTime.MinValue,
-                        DiasGarantia = rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.DiasGarantia,
-                        GarantiaValida = CalcularGarantiaValida(rps.FechaVentaClienteFinal,
-                            rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.DiasGarantia)
+                        FechaVentaClienteFinal = rps.FechaVentaClienteFinal,
+                        DiasGarantia = rps.FkNumeroSerieProductosNavigation.FkProductoNavigation.DiasGarantia
                     })
                     .FirstOrDefaultAsync();
 
-                if (producto == null)
+                if (queryResult == null)
                 {
                     _logger.LogInformation("No hay productos pendientes para técnico ID: {TecnicoId}", tecnicoId);
-                }
-                else
-                {
-                    _logger.LogInformation("Próximo producto encontrado: {ProductoId} - {NumeroSerie}",
-                        producto.Id, producto.NumeroSerie);
+                    return null;
                 }
 
-                return producto;
+                _logger.LogInformation("Próximo producto encontrado: {ProductoId} - {NumeroSerie}",
+                    queryResult.Id, queryResult.NumeroSerie);
+
+                return new TecnicoProductosResponse
+                {
+                    Id = queryResult.Id,
+                    NumeroSerie = queryResult.NumeroSerie,
+                    Marca = queryResult.Marca,
+                    Modelo = queryResult.Modelo,
+                    Especificacion = queryResult.Especificacion,
+                    Estado = queryResult.Estado,
+                    FechaReclamoClienteFinal = queryResult.FechaReclamoClienteFinal,
+                    CodigoReclamo = queryResult.CodigoReclamo,
+                    FormaCompensacion = queryResult.FormaCompensacion,
+                    Precio = queryResult.Precio,
+                    ClienteNombre = queryResult.ClienteNombre,
+                    ClienteRuc = queryResult.ClienteRuc,
+                    FechaVentaClienteFinal = queryResult.FechaVentaClienteFinal ?? DateTime.MinValue,
+                    DiasGarantia = queryResult.DiasGarantia,
+                    GarantiaValida = CalcularGarantiaValida(queryResult.FechaVentaClienteFinal, queryResult.DiasGarantia)
+                };
             }
             catch (Exception ex)
             {
@@ -363,26 +384,6 @@ namespace Infrastructure.Services
                 _logger.LogError(ex, "Error al validar orden de revisación para producto ID: {ProductoId}", reclamoProductoSnId);
                 return false;
             }
-        }
-
-        private bool CalcularGarantiaValida(DateTime? fechaVenta, int diasGarantia)
-        {
-            if (!fechaVenta.HasValue || diasGarantia <= 0)
-            {
-                _logger.LogDebug("Garantía no válida: FechaVenta={FechaVenta}, DiasGarantia={DiasGarantia}", 
-                    fechaVenta, diasGarantia);
-                return false;
-            }
-
-            var fechaLimite = fechaVenta.Value.AddDays(diasGarantia);
-            var hoy = DateTime.Now;
-            var valida = hoy <= fechaLimite;
-            
-            _logger.LogDebug("Cálculo garantía: FechaVenta={FechaVenta}, Dias={Dias}, Limite={Limite}, Hoy={Hoy}, Valida={Valida}",
-                fechaVenta.Value.ToString("yyyy-MM-dd"), diasGarantia, fechaLimite.ToString("yyyy-MM-dd"), 
-                hoy.ToString("yyyy-MM-dd"), valida);
-                
-            return valida;
         }
 
         private async Task<string> GuardarPdfAsync(string pdfBase64, string fileName, int reclamoProductoSnId)
