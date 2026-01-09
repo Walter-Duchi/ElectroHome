@@ -261,10 +261,10 @@ const TecnicoDashboard: React.FC = () => {
                 <Card sx={{ mb: 4, bgcolor: 'primary.light', color: 'white' }}>
                     <CardContent>
                         <Grid container alignItems="center" spacing={2}>
-                            <Grid item>
+                            <Grid>
                                 <Assignment sx={{ fontSize: 40 }} />
                             </Grid>
-                            <Grid item xs>
+                            <Grid size={{ xs: 'auto' }}>
                                 <Typography variant="h6" gutterBottom>
                                     Próximo Producto para Revisión
                                 </Typography>
@@ -281,7 +281,7 @@ const TecnicoDashboard: React.FC = () => {
                                     <strong>Fecha Reclamo:</strong> {new Date(proximoProducto.fechaReclamoClienteFinal).toLocaleDateString()}
                                 </Typography>
                             </Grid>
-                            <Grid item>
+                            <Grid>
                                 <Button
                                     variant="contained"
                                     color="secondary"
@@ -299,7 +299,7 @@ const TecnicoDashboard: React.FC = () => {
 
             {/* Estadísticas */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Card>
                         <CardContent>
                             <Typography color="text.secondary" gutterBottom>
@@ -311,7 +311,7 @@ const TecnicoDashboard: React.FC = () => {
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Card>
                         <CardContent>
                             <Typography color="text.secondary" gutterBottom>
@@ -323,7 +323,7 @@ const TecnicoDashboard: React.FC = () => {
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Card>
                         <CardContent>
                             <Typography color="text.secondary" gutterBottom>
@@ -335,7 +335,7 @@ const TecnicoDashboard: React.FC = () => {
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Card>
                         <CardContent>
                             <Typography color="text.secondary" gutterBottom>
@@ -489,7 +489,7 @@ const TecnicoDashboard: React.FC = () => {
                             </Alert>
 
                             <Grid container spacing={3}>
-                                <Grid item xs={12} md={6}>
+                                <Grid size={{ xs: 12, md: 6 }}>
                                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                                         Información del Producto
                                     </Typography>
@@ -517,7 +517,7 @@ const TecnicoDashboard: React.FC = () => {
                                     </Stack>
                                 </Grid>
                                 
-                                <Grid item xs={12} md={6}>
+                                <Grid size={{ xs: 12, md: 6 }}>
                                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                                         Información del Cliente
                                     </Typography>
@@ -594,14 +594,14 @@ const TecnicoDashboard: React.FC = () => {
                     {productoSeleccionado && (
                         <Box sx={{ mt: 2 }}>
                             <Grid container spacing={3}>
-                                <Grid item xs={12}>
+                                <Grid size={{ xs: 12 }}>
                                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                                         Producto: {productoSeleccionado.marca} {productoSeleccionado.modelo} 
                                         (N° Serie: {productoSeleccionado.numeroSerie})
                                     </Typography>
                                 </Grid>
 
-                                <Grid item xs={12}>
+                                <Grid size={{ xs: 12 }}>
                                     <FormControl fullWidth sx={{ mb: 3 }}>
                                         <InputLabel>Resultado de la Revisión</InputLabel>
                                         <Select
@@ -625,7 +625,7 @@ const TecnicoDashboard: React.FC = () => {
                                     </FormControl>
                                 </Grid>
 
-                                <Grid item xs={12}>
+                                <Grid size={{ xs: 12 }}>
                                     <TextField
                                         label="Explicación Técnica"
                                         multiline
@@ -639,7 +639,7 @@ const TecnicoDashboard: React.FC = () => {
                                     />
                                 </Grid>
 
-                                <Grid item xs={12}>
+                                <Grid size={{ xs: 12 }}>
                                     <Card variant="outlined">
                                         <CardContent>
                                             <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
