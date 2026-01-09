@@ -1,5 +1,6 @@
 using Application.DTOs.Auth;
 using Application.DTOs.Reclamo;
+using Application.DTOs.Tecnico;
 using Application.DTOs.User;
 using Infrastructure.Data;
 using Infrastructure.Services;
@@ -50,6 +51,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBankAccountValidator, BankAccountValidator>();
 builder.Services.AddScoped<IReclamoService, ReclamoService>();
+builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 
 builder.Services.AddCors(options =>
 {
@@ -255,6 +257,128 @@ app.MapPost("/api/reclamos/crear", [Authorize(Roles = "Revisor")] async (CrearRe
     var revisorId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
     var response = await reclamoService.CrearReclamoAsync(request, revisorId);
     return response.Exito ? Results.Ok(response) : Results.BadRequest(response);
+});
+
+// ============================================
+// ENDPOINTS PARA TÉCNICO
+// ============================================
+
+// Obtener productos asignados al técnico
+app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpContext httpContext, ITecnicoService tecnicoService) =>
+{
+    try
+    {
+        var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var productos = await tecnicoService.ObtenerProductosAsignadosAsync(tecnicoId);
+        return Results.Ok(productos);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error al obtener productos del técnico");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Obtener próximo producto a revisar
+app.MapGet("/api/tecnico/proximo-producto", [Authorize(Roles = "Tecnico")] async (HttpContext httpContext, ITecnicoService tecnicoService) =>
+{
+    try
+    {
+        var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var producto = await tecnicoService.ObtenerProximoProductoAsync(tecnicoId);
+
+        if (producto == null)
+        {
+            return Results.NotFound(new { message = "No hay productos pendientes para revisar" });
+        }
+
+        return Results.Ok(producto);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error al obtener próximo producto");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Validar si un producto está en el orden correcto para revisar
+app.MapGet("/api/tecnico/validar-orden/{id}", [Authorize(Roles = "Tecnico")] async (int id, HttpContext httpContext, ITecnicoService tecnicoService) =>
+{
+    try
+    {
+        var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var valido = await tecnicoService.ValidarOrdenRevisacionAsync(id, tecnicoId);
+
+        return Results.Ok(new
+        {
+            valido = valido,
+            message = valido ? "Producto en orden correcto para revisión" : "No está en el orden correcto para revisión"
+        });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error al validar orden de revisión");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Iniciar revisión de un producto
+app.MapPost("/api/tecnico/iniciar-revision", [Authorize(Roles = "Tecnico")] async (IniciarRevisionRequest request, HttpContext httpContext, ITecnicoService tecnicoService) =>
+{
+    try
+    {
+        var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        request.TecnicoId = tecnicoId;
+
+        var resultado = await tecnicoService.IniciarRevisionAsync(request);
+
+        if (!resultado)
+        {
+            return Results.BadRequest(new { message = "No se pudo iniciar la revisión. Verifique que sea el producto más antiguo y que no tenga otra revisión activa." });
+        }
+
+        return Results.Ok(new { message = "Revisión iniciada exitosamente" });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error al iniciar revisión");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Finalizar revisión de un producto
+app.MapPost("/api/tecnico/finalizar-revision", [Authorize(Roles = "Tecnico")] async (FinalizarRevisionRequest request, HttpContext httpContext, ITecnicoService tecnicoService) =>
+{
+    try
+    {
+        var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        request.TecnicoId = tecnicoId;
+
+        // Validaciones adicionales
+        if (request.Estado != "Aprobado" && request.Estado != "Rechazado")
+        {
+            return Results.BadRequest(new { message = "Estado inválido. Debe ser 'Aprobado' o 'Rechazado'" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Explicacion))
+        {
+            return Results.BadRequest(new { message = "La explicación es requerida" });
+        }
+
+        var resultado = await tecnicoService.FinalizarRevisionAsync(request);
+
+        if (!resultado)
+        {
+            return Results.BadRequest(new { message = "No se pudo finalizar la revisión" });
+        }
+
+        return Results.Ok(new { message = "Revisión finalizada exitosamente" });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error al finalizar revisión");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
 });
 
 app.Run();

@@ -8,6 +8,8 @@ import ResetPasswordForm from '../components/Login/ResetPasswordForm';
 import DashboardLayout from '../components/Layout/DashboardLayout';
 import Dashboard from '../components/Dashboard/Dashboard';
 import CrearReclamo from '../components/Reclamo/CrearReclamo';
+import TecnicoDashboard from '../components/Tecnico/TecnicoDashboard';
+import RevisarProducto from '../components/Tecnico/RevisarProducto';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -106,6 +108,30 @@ const AppContent: React.FC = () => {
               </DashboardLayout>
             </ProtectedRoute>
           }
+        />
+
+        {/* Ruta para dashboard del técnico */}
+        <Route
+            path="/tecnico"
+            element={
+                <ProtectedRoute allowedRoles={['Tecnico']}>
+                    <DashboardLayout>
+                        <TecnicoDashboard />
+                    </DashboardLayout>
+                </ProtectedRoute>
+            }
+        />
+
+        {/* Ruta para revisar producto específico */}
+        <Route
+            path="/tecnico/revisar/:id"
+            element={
+                <ProtectedRoute allowedRoles={['Tecnico']}>
+                    <DashboardLayout>
+                        <RevisarProducto />
+                    </DashboardLayout>
+                </ProtectedRoute>
+            }
         />
 
         {/* Ruta por defecto para cualquier otra ruta */}

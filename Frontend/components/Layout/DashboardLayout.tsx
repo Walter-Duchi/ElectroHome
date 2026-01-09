@@ -1,6 +1,7 @@
 import { AddReaction as AddReclamoIcon } from '@mui/icons-material';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Engineering } from '@mui/icons-material';
 
 import {
   AppBar,
@@ -199,6 +200,18 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             >
               Crear Usuario
             </Button>
+          )}
+
+          {userRole === 'Tecnico' && (
+          <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Engineering />}
+              onClick={() => navigate('/tecnico')}
+              sx={{ mr: 2 }}
+          >
+              Mis Revisiones
+          </Button>
           )}
 
           {userRole === 'Revisor' && (
