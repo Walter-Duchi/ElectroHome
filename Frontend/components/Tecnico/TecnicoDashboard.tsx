@@ -28,7 +28,6 @@ import {
     Select,
     MenuItem,
     FormHelperText,
-    LinearProgress,
     Stack,
     Divider
 } from '@mui/material';
@@ -43,13 +42,11 @@ import {
     Paid,
     Build,
     Engineering,
-    Warning,
-    Download,
     Upload
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
 import { tecnicoService } from '../../services/tecnicoService';
-import { TecnicoProducto } from '../../src/types/tecnico';
+import { type TecnicoProducto } from '../../src/types/tecnico';
 
 const TecnicoDashboard: React.FC = () => {
     const { auth } = useAuth();

@@ -5,7 +5,6 @@ import {
     Card,
     CardContent,
     Grid,
-    Paper,
     Button,
     Alert,
     CircularProgress,
@@ -22,8 +21,6 @@ import {
     Select,
     MenuItem,
     FormHelperText,
-    IconButton,
-    Tooltip
 } from '@mui/material';
 import {
     Build,
@@ -36,13 +33,12 @@ import {
     CheckCircle,
     Cancel,
     Upload,
-    Download,
     ArrowBack
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/authContext';
 import { tecnicoService } from '../../services/tecnicoService';
-import { TecnicoProducto } from '../../src/types/tecnico';
+import { type TecnicoProducto } from '../../src/types/tecnico';
 
 const RevisarProducto: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -220,8 +216,8 @@ const RevisarProducto: React.FC = () => {
             )}
 
             <Grid container spacing={3}>
-                {/* Columna izquierda: Información del producto */}
-                <Grid item xs={12} md={6}>
+          {/* Columna izquierda: Información del producto */}
+          <Grid size={{xs: 12, md: 6}}>
                     <Card sx={{ mb: 3 }}>
                         <CardContent>
                             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -352,8 +348,8 @@ const RevisarProducto: React.FC = () => {
                     </Card>
                 </Grid>
 
-                {/* Columna derecha: Formulario de revisión */}
-                <Grid item xs={12} md={6}>
+          {/* Columna derecha: Formulario de revisión */}
+                <Grid size={{ xs: 12, md: 6 }}>
                     {!revisionIniciada ? (
                         <Card>
                             <CardContent>

@@ -1,9 +1,9 @@
 import api from './api';
 import {
-    TecnicoProducto,
-    IniciarRevisionRequest,
-    FinalizarRevisionRequest,
-    ValidarOrdenResponse
+    type TecnicoProducto,
+    type IniciarRevisionRequest,
+    type FinalizarRevisionRequest,
+    type ValidarOrdenResponse
 } from '../src/types/tecnico';
 
 export const tecnicoService = {
