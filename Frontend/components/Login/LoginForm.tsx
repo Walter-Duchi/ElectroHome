@@ -274,10 +274,10 @@ const LoginForm: React.FC = () => {
                   Personal Entrega
                 </Typography>
                 <Typography variant="caption" display="block">
-                  luis.mendoza@logistica.com
+                  roberto.mendoza@logistica.com
                 </Typography>
                 <Typography variant="caption" display="block">
-                  Luis321*
+                  Roberto123*
                 </Typography>
               </Box>
             </Grid>
