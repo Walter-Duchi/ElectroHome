@@ -1,7 +1,9 @@
 using Application.DTOs.Auth;
+using Application.DTOs.Entrega;
 using Application.DTOs.Reclamo;
 using Application.DTOs.Tecnico;
 using Application.DTOs.User;
+using Application.DTOs.Entrega;
 using Infrastructure.Data;
 using Infrastructure.Interfaces;
 using Infrastructure.Services;
@@ -87,6 +89,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBankAccountValidator, BankAccountValidator>();
 builder.Services.AddScoped<IReclamoService, ReclamoService>();
 builder.Services.AddScoped<ITecnicoService, TecnicoService>();
+builder.Services.AddScoped<IEntregaService, EntregaService>();
 
 builder.Services.AddCors(options =>
 {
@@ -655,5 +658,195 @@ app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> 
         return Results.Problem($"Error en diagnóstico: {ex.Message}");
     }
 }).AllowAnonymous();
+
+
+// ============================================
+// ENDPOINTS PARA PERSONAL DE ENTREGA
+// ============================================
+
+// Buscar reclamo para entrega
+app.MapPost("/api/entrega/buscar-reclamo", [Authorize(Roles = "Personal de Entrega")] async (
+    BuscarReclamoRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        logger.LogInformation($"Buscando reclamo para entrega: {request.CodigoReclamo}");
+        var response = await entregaService.BuscarReclamoAsync(request.CodigoReclamo);
+        return response.Exito ? Results.Ok(response) : Results.BadRequest(response);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al buscar reclamo: {request.CodigoReclamo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Validar producto de reemplazo
+app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
+    ValidarReemplazoRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        logger.LogInformation($"Validando producto de reemplazo: {request.NumeroSerieReemplazo}");
+        var response = await entregaService.ValidarProductoReemplazoAsync(
+            request.ReclamoProductoSnId,
+            request.NumeroSerieReemplazo);
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al validar reemplazo: {request.NumeroSerieReemplazo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Seleccionar producto de reemplazo
+app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
+    SeleccionarReemplazoRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var personalEntregaId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation($"Seleccionando reemplazo para producto: {request.ReclamoProductoSnId}");
+
+        var resultado = await entregaService.SeleccionarReemplazoAsync(request, personalEntregaId);
+        return resultado ?
+            Results.Ok(new { message = "Reemplazo seleccionado exitosamente" }) :
+            Results.BadRequest(new { message = "No se pudo seleccionar el reemplazo" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al seleccionar reemplazo: {request.ReclamoProductoSnId}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Verificar si todos los productos tienen reemplazo
+app.MapGet("/api/entrega/verificar-reemplazos/{codigoReclamo}", [Authorize(Roles = "Personal de Entrega")] async (
+    string codigoReclamo,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        logger.LogInformation($"Verificando reemplazos para: {codigoReclamo}");
+        var todosTienenReemplazo = await entregaService.TodosProductosTienenReemplazoAsync(codigoReclamo);
+        return Results.Ok(new { todosTienenReemplazo });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al verificar reemplazos: {codigoReclamo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Generar datos para comprobante
+app.MapPost("/api/entrega/generar-datos-comprobante", [Authorize(Roles = "Personal de Entrega")] async (
+    GenerarComprobanteRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var personalEntregaId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation($"Generando datos para comprobante: {request.CodigoReclamo}");
+
+        var comprobante = await entregaService.GenerarDatosComprobanteAsync(request.CodigoReclamo, personalEntregaId);
+        return Results.Ok(comprobante);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al generar datos para comprobante: {request.CodigoReclamo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Generar PDF de comprobante
+app.MapPost("/api/entrega/generar-pdf-comprobante", [Authorize(Roles = "Personal de Entrega")] async (
+    ComprobanteEntregaDTO comprobante,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        logger.LogInformation($"Generando PDF para comprobante: {comprobante.CodigoReclamo}");
+
+        var rutaPdf = await entregaService.GenerarPdfComprobanteAsync(comprobante);
+        return Results.Ok(new { rutaPdf });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al generar PDF para comprobante: {comprobante.CodigoReclamo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Subir comprobante firmado
+app.MapPost("/api/entrega/subir-comprobante", [Authorize(Roles = "Personal de Entrega")] async (
+    SubirComprobanteRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var personalEntregaId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation($"Subiendo comprobante firmado para: {request.CodigoReclamo}");
+
+        var resultado = await entregaService.SubirComprobanteAsync(request, personalEntregaId);
+        return resultado ?
+            Results.Ok(new { message = "Comprobante subido exitosamente" }) :
+            Results.BadRequest(new { message = "No se pudo subir el comprobante" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al subir comprobante: {request.CodigoReclamo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Confirmar entrega
+app.MapPost("/api/entrega/confirmar-entrega", [Authorize(Roles = "Personal de Entrega")] async (
+    ConfirmarEntregaRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var personalEntregaId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation($"Confirmando entrega para: {request.CodigoReclamo}");
+
+        var resultado = await entregaService.ConfirmarEntregaAsync(request, personalEntregaId);
+        return resultado ?
+            Results.Ok(new { message = "Entrega confirmada exitosamente" }) :
+            Results.BadRequest(new { message = "No se pudo confirmar la entrega" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al confirmar entrega: {request.CodigoReclamo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
 
 app.Run();
