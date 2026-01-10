@@ -2,6 +2,7 @@ import { AddReaction as AddReclamoIcon } from '@mui/icons-material';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Engineering } from '@mui/icons-material';
+import { LocalShipping } from '@mui/icons-material';
 
 import {
   AppBar,
@@ -224,6 +225,18 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               sx={{ mr: 2 }}
             >
               Crear Reclamo
+            </Button>
+          )}
+
+          {userRole === 'Personal de Entrega' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<LocalShipping />}
+              onClick={() => navigate('/entrega')}
+              sx={{ mr: 2 }}
+            >
+              Procesar Entregas
             </Button>
           )}
 

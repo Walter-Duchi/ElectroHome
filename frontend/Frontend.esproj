@@ -12,6 +12,7 @@
     <Folder Include="components\Login\" />
     <Folder Include="components\Dashboard\" />
     <Folder Include="components\Layout\" />
+    <Folder Include="components\Entrega\" />
     <Folder Include="components\ThemeSelector\" />
     <Folder Include="components\Reclamo\" />
   </ItemGroup>

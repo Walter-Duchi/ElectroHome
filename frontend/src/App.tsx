@@ -10,6 +10,7 @@ import Dashboard from '../components/Dashboard/Dashboard';
 import CrearReclamo from '../components/Reclamo/CrearReclamo';
 import TecnicoDashboard from '../components/Tecnico/TecnicoDashboard';
 import RevisarProducto from '../components/Tecnico/RevisarProducto';
+import EntregaDashboard from '../components/Entrega/EntregaDashboard';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -132,6 +133,17 @@ const AppContent: React.FC = () => {
                     </DashboardLayout>
                 </ProtectedRoute>
             }
+        />
+
+        <Route
+          path="/entrega"
+          element={
+            <ProtectedRoute allowedRoles={['Personal de Entrega']}>
+              <DashboardLayout>
+                <EntregaDashboard />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
         />
 
         {/* Ruta por defecto para cualquier otra ruta */}
