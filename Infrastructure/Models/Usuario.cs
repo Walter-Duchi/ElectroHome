@@ -29,6 +29,8 @@ public partial class Usuario
 
     public string? TipoCuentaBancaria { get; set; }
 
+    public virtual ICollection<ComprobanteDeReemplazo> ComprobanteDeReemplazos { get; set; } = new List<ComprobanteDeReemplazo>();
+
     public virtual ICollection<Reclamo> Reclamos { get; set; } = new List<Reclamo>();
 
     public virtual ICollection<ReclamosProductoSn> ReclamosProductoSns { get; set; } = new List<ReclamosProductoSn>();

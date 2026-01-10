@@ -1,4 +1,4 @@
-import { createTheme, Theme } from '@mui/material/styles';
+import { createTheme, type Theme } from '@mui/material/styles';
 import { esES } from '@mui/material/locale';
 
 // Paleta de colores corporativa optimizada - MODO CLARO
