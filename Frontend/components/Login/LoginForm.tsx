@@ -285,7 +285,7 @@ const LoginForm: React.FC = () => {
 
           <Box sx={{ mt: 4, textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">
-              © 2024 Sistema Corporativo. Todos los derechos reservados.
+              © 2026 Sistema Corporativo. Todos los derechos reservados.
             </Typography>
           </Box>
         </Paper>

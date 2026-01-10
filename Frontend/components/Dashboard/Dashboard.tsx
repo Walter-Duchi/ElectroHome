@@ -433,7 +433,7 @@ const Dashboard: React.FC = () => {
       {/* Información del Sistema */}
       <Box sx={{ mt: 4, textAlign: 'center' }}>
         <Typography variant="caption" color="text.secondary">
-          Sistema Corporativo v2.1.0 • Última actualización: 2024-12-19
+          Sistema Corporativo v2.1.0 • Última actualización: 2026
         </Typography>
       </Box>
     </Box>
