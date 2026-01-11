@@ -1,0 +1,81 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <title>Comprobante de Entrega - REC-ENTREGA-001</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .title { font-size: 24px; font-weight: bold; }
+            .info { margin-top: 30px; }
+            .info-row { margin: 10px 0; }
+            .info-label { font-weight: bold; display: inline-block; width: 200px; }
+            .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .table th { background-color: #f2f2f2; }
+            .footer { margin-top: 50px; text-align: center; }
+            .signature { margin-top: 100px; border-top: 1px solid #333; padding-top: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class='header'>
+            <div class='title'>COMPROBANTE DE ENTREGA</div>
+            <div>Sistema de Gestión de Reclamos</div>
+        </div>
+        
+        <div class='info'>
+            <div class='info-row'>
+                <span class='info-label'>Código de Reclamo:</span>
+                <span>REC-ENTREGA-001</span>
+            </div>
+            <div class='info-row'>
+                <span class='info-label'>Cliente:</span>
+                <span>Juan Pérez</span>
+            </div>
+            <div class='info-row'>
+                <span class='info-label'>RUC:</span>
+                <span>0912345678001</span>
+            </div>
+            <div class='info-row'>
+                <span class='info-label'>Fecha de Entrega:</span>
+                <span>11/01/2026 01:27</span>
+            </div>
+            <div class='info-row'>
+                <span class='info-label'>Personal de Entrega:</span>
+                <span>Roberto Mendoza</span>
+            </div>
+        </div>
+        
+        <h3>Productos Entregados</h3>
+        <table class='table'>
+            <thead>
+                <tr>
+                    <th>Producto Defectuoso</th>
+                    <th>Marca</th>
+                    <th>Modelo</th>
+                    <th>Producto de Reemplazo</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td>MPXJ3LL/A</td>
+                    <td>Apple</td>
+                    <td>iPhone 15 Pro</td>
+                    <td>MPXJ3LL-REP01</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class='footer'>
+            <div class='signature'>
+                <p>___________________________________</p>
+                <p>Firma del Cliente</p>
+                <p>Nombre: ___________________________</p>
+                <p>Cédula/RUC: ______________________</p>
+                <p>Fecha: ____________________________</p>
+            </div>
+        </div>
+    </body>
+    </html>

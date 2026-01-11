@@ -3,18 +3,18 @@ using Application.DTOs.Entrega;
 using Application.DTOs.Reclamo;
 using Application.DTOs.Tecnico;
 using Application.DTOs.User;
-using Application.DTOs.Entrega;
 using Infrastructure.Data;
 using Infrastructure.Interfaces;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -157,6 +157,44 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Servir archivos estáticos desde la carpeta Documents
+var documentsPath = Path.Combine(Directory.GetCurrentDirectory(), "Documents");
+if (!Directory.Exists(documentsPath))
+{
+    Directory.CreateDirectory(documentsPath);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(documentsPath),
+    RequestPath = "/Documents",
+    ServeUnknownFileTypes = true, // Para servir archivos PDF
+    DefaultContentType = "application/octet-stream"
+});
+
+// También servir archivos desde wwwroot si los hay
+app.UseStaticFiles();
+
+// Configurar MIME types para archivos comunes
+var provider = new FileExtensionContentTypeProvider();
+provider.Mappings[".pdf"] = "application/pdf";
+provider.Mappings[".txt"] = "text/plain";
+provider.Mappings[".csv"] = "text/csv";
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(documentsPath),
+    RequestPath = "/Documents",
+    ContentTypeProvider = provider
+});
+
+// Asegurar que la carpeta 'entrega' existe
+var entregaPath = Path.Combine(documentsPath, "entrega");
+if (!Directory.Exists(entregaPath))
+{
+    Directory.CreateDirectory(entregaPath);
+}
 
 // Middleware para logging de rutas disponibles (solo desarrollo)
 if (app.Environment.IsDevelopment())
@@ -863,6 +901,22 @@ app.MapPost("/api/entrega/confirmar-entrega", [Authorize(Roles = "Personal de En
         logger.LogError(ex, $"Error al confirmar entrega: {request.CodigoReclamo}");
         return Results.Problem($"Error interno: {ex.Message}");
     }
+});
+
+// Endpoint para servir PDFs (temporal)
+app.MapGet("/Documents/entrega/{fileName}", async (string fileName, HttpContext context) =>
+{
+    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "Documents", "entrega", fileName);
+
+    if (!File.Exists(filePath))
+    {
+        context.Response.StatusCode = 404;
+        await context.Response.WriteAsync("Archivo no encontrado");
+        return;
+    }
+
+    context.Response.ContentType = "application/pdf";
+    await context.Response.SendFileAsync(filePath);
 });
 
 app.Run();
