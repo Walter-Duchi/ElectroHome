@@ -168,7 +168,9 @@ namespace Infrastructure.Services
 
                 // Verificar que el producto de reemplazo no esté ya asignado a otro reclamo
                 var yaAsignado = await _context.ComprobanteProductoReemplazados
-                    .AnyAsync(cpr => cpr.FkProductoDeReemplazo == productoReemplazo.Id);
+                    .Include(cpr => cpr.FkReclamosProductoSnNavigation)
+                    .AnyAsync(cpr => cpr.FkProductoDeReemplazo == productoReemplazo.Id
+                    && cpr.FkReclamosProductoSn != reclamoProductoSnId);
 
                 if (yaAsignado)
                 {
@@ -176,6 +178,16 @@ namespace Infrastructure.Services
                     {
                         Valido = false,
                         Mensaje = "El producto de reemplazo ya ha sido asignado a otro reclamo"
+                    };
+                }
+                    
+                // Verificar que no sea el mismo producto defectuoso
+                if (productoReclamado.FkNumeroSerieProductos == productoReemplazo.Id)
+                {
+                    return new ValidarReemplazoResponse
+                    {
+                        Valido = false,
+                        Mensaje = "No puede asignar el mismo producto defectuoso como reemplazo"
                     };
                 }
 
@@ -230,16 +242,37 @@ namespace Infrastructure.Services
                     _context.ComprobanteProductoReemplazados.Remove(productoReclamado.ComprobanteProductoReemplazado);
                 }
 
+                // Crear un ComprobanteDeReemplazo temporal con estado pendiente
+                var comprobanteReemplazo = new ComprobanteDeReemplazo
+                {
+                    PdfComprobanteEntregaCliente = "PENDIENTE_" + Guid.NewGuid().ToString(),
+                    FkPersonalEntrega = personalEntregaId
+                };
+
+                _context.ComprobanteDeReemplazos.Add(comprobanteReemplazo);
+                await _context.SaveChangesAsync();
+
                 // Crear la relación en ComprobanteProductoReemplazado
                 var comprobanteProducto = new ComprobanteProductoReemplazado
                 {
                     FkReclamosProductoSn = request.ReclamoProductoSnId,
-                    FkProductoDeReemplazo = validacion.ProductoReemplazo!.Id
-                    // FK_Comprobante_De_Reemplazo se asignará cuando se suba el PDF
+                    FkProductoDeReemplazo = validacion.ProductoReemplazo!.Id,
+                    FkComprobanteDeReemplazo = comprobanteReemplazo.Id
                 };
 
                 _context.ComprobanteProductoReemplazados.Add(comprobanteProducto);
                 await _context.SaveChangesAsync();
+
+                // Actualizar el estado del producto de reemplazo a "Entregado_Como_Reemplazo_Al_Cliente"
+                var productoReemplazo = await _context.NumeroSerieProductos
+                    .FindAsync(validacion.ProductoReemplazo.Id);
+
+                if (productoReemplazo != null)
+                {
+                    productoReemplazo.EstadoInventario = "Entregado_Como_Reemplazo_Al_Cliente";
+                    await _context.SaveChangesAsync();
+                }
+
                 await transaction.CommitAsync();
 
                 _logger.LogInformation($"Reemplazo seleccionado exitosamente para producto: {request.ReclamoProductoSnId}");
@@ -356,6 +389,7 @@ namespace Infrastructure.Services
                 var reclamo = await _context.Reclamos
                     .Include(r => r.ReclamosProductoSns)
                         .ThenInclude(rps => rps.ComprobanteProductoReemplazado)
+                            .ThenInclude(cpr => cpr.FkComprobanteDeReemplazoNavigation)
                     .FirstOrDefaultAsync(r => r.CodigoReclamo == request.CodigoReclamo);
 
                 if (reclamo == null)
@@ -374,35 +408,32 @@ namespace Infrastructure.Services
                     throw new InvalidOperationException("Todos los productos deben tener un reemplazo asignado antes de subir el comprobante");
                 }
 
+                // Obtener el comprobante existente (creado al asignar el reemplazo)
+                var comprobanteExistente = reclamo.ReclamosProductoSns
+                    .Where(rps => rps.ComprobanteProductoReemplazado != null)
+                    .Select(rps => rps.ComprobanteProductoReemplazado.FkComprobanteDeReemplazoNavigation)
+                    .FirstOrDefault();
+
+                if (comprobanteExistente == null)
+                {
+                    throw new InvalidOperationException("No se encontró comprobante para actualizar");
+                }
+
                 // Guardar el PDF en el sistema de archivos
                 var nombreArchivo = $"Comprobante_Firmado_{request.CodigoReclamo}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
                 var rutaArchivo = $"/Documents/entrega/firmados/{nombreArchivo}";
 
-                // Convertir base64 a archivo (simulación)
-                var pdfBytes = Convert.FromBase64String(request.PdfBase64);
-                // En producción, guardarías el archivo en el sistema de archivos
-                // await File.WriteAllBytesAsync(rutaArchivo, pdfBytes);
+                // Actualizar el comprobante existente con el PDF firmado
+                comprobanteExistente.PdfComprobanteEntregaCliente = rutaArchivo;
 
-                // Crear comprobante de reemplazo
-                var comprobanteReemplazo = new ComprobanteDeReemplazo
+                // Actualizar el PDF de cada producto reclamado si es necesario
+                foreach (var productoReclamado in reclamo.ReclamosProductoSns)
                 {
-                    PdfComprobanteEntregaCliente = rutaArchivo,
-                    FkPersonalEntrega = personalEntregaId
-                };
-
-                _context.ComprobanteDeReemplazos.Add(comprobanteReemplazo);
-                await _context.SaveChangesAsync();
-
-                // Actualizar los comprobantes de producto reemplazado con el ID del comprobante
-                var productosConReemplazo = reclamo.ReclamosProductoSns
-                    .Where(rps => rps.Estado == "Aprobado" && rps.FormaCompensacion == "Reemplazo")
-                    .Select(rps => rps.ComprobanteProductoReemplazado)
-                    .Where(cpr => cpr != null)
-                    .ToList();
-
-                foreach (var productoReemplazado in productosConReemplazo)
-                {
-                    productoReemplazado!.FkComprobanteDeReemplazo = comprobanteReemplazo.Id;
+                    if (productoReclamado.ComprobanteProductoReemplazado != null)
+                    {
+                        // Asegurar que todos apunten al mismo comprobante
+                        productoReclamado.ComprobanteProductoReemplazado.FkComprobanteDeReemplazo = comprobanteExistente.Id;
+                    }
                 }
 
                 await _context.SaveChangesAsync();
@@ -418,7 +449,6 @@ namespace Infrastructure.Services
                 throw;
             }
         }
-
         public async Task<bool> ConfirmarEntregaAsync(ConfirmarEntregaRequest request, int personalEntregaId)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();

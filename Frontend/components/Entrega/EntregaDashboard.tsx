@@ -62,6 +62,8 @@ const EntregaDashboard: React.FC = () => {
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [asignando, setAsignando] = useState(false);
+
 
   const steps = [
     'Buscar Reclamo',
@@ -129,8 +131,8 @@ const EntregaDashboard: React.FC = () => {
       setValidationResult(response);
 
       if (response.valido) {
-        // Si es válido, asignar automáticamente
-        await handleAsignarReemplazo();
+        // NO asignar automáticamente, solo mostrar mensaje de éxito
+        setSuccess('Producto válido. Ahora puede asignarlo.');
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al validar el reemplazo');
@@ -141,9 +143,11 @@ const EntregaDashboard: React.FC = () => {
 
   const handleAsignarReemplazo = async () => {
     if (!selectedProduct || !reemplazoInput.trim() || !validationResult?.valido) {
+      setError('Primero debe validar un producto válido');
       return;
     }
 
+    setAsignando(true);
     try {
       await entregaService.seleccionarReemplazo(
         selectedProduct.reclamoProductoSnId,
@@ -163,6 +167,8 @@ const EntregaDashboard: React.FC = () => {
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al asignar el reemplazo');
+    } finally {
+      setAsignando(false);
     }
   };
 
@@ -615,7 +621,15 @@ const EntregaDashboard: React.FC = () => {
             disabled={validating || !reemplazoInput.trim()}
             startIcon={validating ? <CircularProgress size={20} /> : <Check />}
           >
-            {validating ? 'Validando...' : 'Validar y Asignar'}
+            {validating ? 'Validando...' : 'Validar'}
+          </Button>
+          <Button
+            onClick={handleAsignarReemplazo}
+            disabled={!validationResult?.valido || asignando}
+            startIcon={asignando ? <CircularProgress size={20} /> : <Assignment />}
+            color="success"
+          >
+            {asignando ? 'Asignando...' : 'Asignar'}
           </Button>
         </DialogActions>
       </Dialog>

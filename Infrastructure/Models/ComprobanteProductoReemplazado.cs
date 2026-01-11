@@ -9,11 +9,11 @@ public partial class ComprobanteProductoReemplazado
 
     public int FkReclamosProductoSn { get; set; }
 
-    public int FkComprobanteDeReemplazo { get; set; }
+    public int? FkComprobanteDeReemplazo { get; set; }
 
     public int FkProductoDeReemplazo { get; set; }
 
-    public virtual ComprobanteDeReemplazo FkComprobanteDeReemplazoNavigation { get; set; } = null!;
+    public virtual ComprobanteDeReemplazo? FkComprobanteDeReemplazoNavigation { get; set; }
 
     public virtual NumeroSerieProducto FkProductoDeReemplazoNavigation { get; set; } = null!;
 

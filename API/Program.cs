@@ -709,6 +709,7 @@ app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de En
 });
 
 // Seleccionar producto de reemplazo
+// En el método de seleccionar reemplazo, agregar más logging:
 app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
     SeleccionarReemplazoRequest request,
     IEntregaService entregaService,
@@ -718,18 +719,33 @@ app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal d
 
     try
     {
+        logger.LogInformation("=== INICIO: Seleccionar Reemplazo ===");
+        logger.LogInformation($"Request: ReclamoProductoSnId={request.ReclamoProductoSnId}, NumeroSerieReemplazo={request.NumeroSerieReemplazo}");
+
         var personalEntregaId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        logger.LogInformation($"Seleccionando reemplazo para producto: {request.ReclamoProductoSnId}");
+        logger.LogInformation($"Personal Entrega ID: {personalEntregaId}");
 
         var resultado = await entregaService.SeleccionarReemplazoAsync(request, personalEntregaId);
+
+        logger.LogInformation("=== ÉXITO: Reemplazo seleccionado ===");
         return resultado ?
             Results.Ok(new { message = "Reemplazo seleccionado exitosamente" }) :
             Results.BadRequest(new { message = "No se pudo seleccionar el reemplazo" });
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, $"Error al seleccionar reemplazo: {request.ReclamoProductoSnId}");
-        return Results.Problem($"Error interno: {ex.Message}");
+        logger.LogError(ex, "=== ERROR: Seleccionar Reemplazo ===");
+        logger.LogError($"Mensaje: {ex.Message}");
+        logger.LogError($"StackTrace: {ex.StackTrace}");
+        if (ex.InnerException != null)
+        {
+            logger.LogError($"Inner Exception: {ex.InnerException.Message}");
+        }
+
+        return Results.Problem(
+            detail: $"Error interno: {ex.Message}",
+            statusCode: StatusCodes.Status500InternalServerError,
+            title: "Error del servidor");
     }
 });
 

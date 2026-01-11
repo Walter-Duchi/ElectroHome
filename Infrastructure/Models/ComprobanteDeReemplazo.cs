@@ -11,6 +11,8 @@ public partial class ComprobanteDeReemplazo
 
     public int FkPersonalEntrega { get; set; }
 
+    public string? Estado { get; set; }
+
     public virtual ICollection<ComprobanteProductoReemplazado> ComprobanteProductoReemplazados { get; set; } = new List<ComprobanteProductoReemplazado>();
 
     public virtual Usuario FkPersonalEntregaNavigation { get; set; } = null!;
