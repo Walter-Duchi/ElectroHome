@@ -4,10 +4,14 @@ using Infrastructure.Interfaces;
 using Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace Infrastructure.Services
 {
@@ -15,11 +19,19 @@ namespace Infrastructure.Services
     {
         private readonly ReclamosContext _context;
         private readonly ILogger<EntregaService> _logger;
+        private readonly string _entregaDocumentsPath;
 
         public EntregaService(ReclamosContext context, ILogger<EntregaService> logger)
         {
             _context = context;
             _logger = logger;
+
+            // Definir la ruta donde se guardarán los PDFs
+            _entregaDocumentsPath = Path.Combine(Directory.GetCurrentDirectory(), "Documents", "entrega");
+            if (!Directory.Exists(_entregaDocumentsPath))
+            {
+                Directory.CreateDirectory(_entregaDocumentsPath);
+            }
         }
 
         public async Task<BuscarReclamoResponse> BuscarReclamoAsync(string codigoReclamo)
@@ -72,6 +84,23 @@ namespace Infrastructure.Services
                 // Contar productos pendientes de revisión
                 var productosPendientesRevision = todosProductos
                     .Count(rps => rps.Estado != "Aprobado" && rps.Estado != "Rechazado" && rps.Estado != "Compensado");
+
+                // VERIFICACIÓN CRÍTICA: Si no hay productos para entregar, NO permitir continuar
+                if (!productosParaEntrega.Any())
+                {
+                    return new BuscarReclamoResponse
+                    {
+                        Exito = false,
+                        Mensaje = "No hay productos para entregar en este reclamo. Los productos deben estar aprobados y con forma de compensación 'Reemplazo'.",
+                        CodigoReclamo = reclamo.CodigoReclamo,
+                        Cliente = $"{reclamo.FkEmpresaClienteNavigation.Nombres} {reclamo.FkEmpresaClienteNavigation.Apellidos}",
+                        Ruc = reclamo.FkEmpresaClienteNavigation.Ruc,
+                        Productos = new List<ProductoEntregaDTO>(),
+                        TodosProductosRevisados = productosPendientesRevision == 0,
+                        TotalProductosReclamo = todosProductos.Count,
+                        ProductosPendientesRevision = productosPendientesRevision
+                    };
+                }
 
                 return new BuscarReclamoResponse
                 {
@@ -180,7 +209,7 @@ namespace Infrastructure.Services
                         Mensaje = "El producto de reemplazo ya ha sido asignado a otro reclamo"
                     };
                 }
-                    
+
                 // Verificar que no sea el mismo producto defectuoso
                 if (productoReclamado.FkNumeroSerieProductos == productoReemplazo.Id)
                 {
@@ -246,7 +275,8 @@ namespace Infrastructure.Services
                 var comprobanteReemplazo = new ComprobanteDeReemplazo
                 {
                     PdfComprobanteEntregaCliente = "PENDIENTE_" + Guid.NewGuid().ToString(),
-                    FkPersonalEntrega = personalEntregaId
+                    FkPersonalEntrega = personalEntregaId,
+                    Estado = "Pendiente"
                 };
 
                 _context.ComprobanteDeReemplazos.Add(comprobanteReemplazo);
@@ -325,6 +355,16 @@ namespace Infrastructure.Services
                     throw new InvalidOperationException("Todos los productos deben tener un reemplazo asignado antes de generar el comprobante");
                 }
 
+                // VERIFICACIÓN CRÍTICA: Si no hay productos para entregar, lanzar excepción
+                var productosAEntregar = reclamo.ReclamosProductoSns
+                    .Where(rps => rps.Estado == "Aprobado" && rps.FormaCompensacion == "Reemplazo")
+                    .ToList();
+
+                if (!productosAEntregar.Any())
+                {
+                    throw new InvalidOperationException("No hay productos para entregar. No se puede generar el comprobante.");
+                }
+
                 var productosComprobante = reclamo.ReclamosProductoSns
                     .Where(rps => rps.Estado == "Aprobado" && rps.FormaCompensacion == "Reemplazo")
                     .Select(rps => new ProductoEntregaComprobanteDTO
@@ -343,7 +383,7 @@ namespace Infrastructure.Services
                     FechaEntrega = DateTime.UtcNow,
                     PersonalEntrega = $"{personalEntrega.Nombres} {personalEntrega.Apellidos}",
                     Productos = productosComprobante,
-                    FirmaBase64 = string.Empty // Se llenará en el frontend
+                    FirmaBase64 = string.Empty
                 };
             }
             catch (Exception ex)
@@ -359,31 +399,25 @@ namespace Infrastructure.Services
             {
                 _logger.LogInformation($"Generando PDF para comprobante de reclamo: {comprobante.CodigoReclamo}");
 
-                // Crear nombre de archivo único
-                var nombreArchivo = $"Comprobante_Entrega_{comprobante.CodigoReclamo}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
-
-                // Ruta relativa para la web
-                var rutaRelativaWeb = $"/Documents/entrega/{nombreArchivo}";
-
-                // Ruta física completa
-                var rutaFisica = Path.Combine(Directory.GetCurrentDirectory(), "Documents", "entrega", nombreArchivo);
-
-                // Asegurar que el directorio existe
-                var directorio = Path.GetDirectoryName(rutaFisica);
-                if (!Directory.Exists(directorio))
+                // VERIFICACIÓN CRÍTICA: Si no hay productos, no generar PDF
+                if (!comprobante.Productos.Any())
                 {
-                    Directory.CreateDirectory(directorio);
+                    throw new InvalidOperationException("No hay productos para incluir en el comprobante. No se puede generar el PDF.");
                 }
 
-                // Generar contenido HTML del comprobante
-                var htmlContent = GenerarHtmlComprobante(comprobante);
+                // Crear nombre de archivo único basado en timestamp
+                var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                var nombreArchivo = $"Comprobante_Entrega_{comprobante.CodigoReclamo}_{timestamp}.pdf";
+                var rutaCompleta = Path.Combine(_entregaDocumentsPath, nombreArchivo);
 
-                // En una implementación real, usarías una librería como iTextSharp o QuestPDF
-                // Para este ejemplo, crearé un PDF básico usando DinkToPdf o similar
-                await GenerarPdfDesdeHtml(htmlContent, rutaFisica);
+                // Generar PDF usando QuestPDF
+                var document = new ComprobanteEntregaDocument(comprobante);
+                document.GeneratePdf(rutaCompleta);
 
-                _logger.LogInformation($"PDF generado en: {rutaFisica}");
-                return rutaRelativaWeb;
+                _logger.LogInformation($"PDF generado exitosamente en: {rutaCompleta}");
+
+                // Retornar ruta relativa para la web
+                return $"/Documents/entrega/{nombreArchivo}";
             }
             catch (Exception ex)
             {
@@ -392,132 +426,18 @@ namespace Infrastructure.Services
             }
         }
 
-        private string GenerarHtmlComprobante(ComprobanteEntregaDTO comprobante)
-        {
-            return $@"
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset='UTF-8'>
-        <title>Comprobante de Entrega - {comprobante.CodigoReclamo}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; }}
-            .header {{ text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; }}
-            .title {{ font-size: 24px; font-weight: bold; }}
-            .info {{ margin-top: 30px; }}
-            .info-row {{ margin: 10px 0; }}
-            .info-label {{ font-weight: bold; display: inline-block; width: 200px; }}
-            .table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            .table th, .table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-            .table th {{ background-color: #f2f2f2; }}
-            .footer {{ margin-top: 50px; text-align: center; }}
-            .signature {{ margin-top: 100px; border-top: 1px solid #333; padding-top: 20px; }}
-        </style>
-    </head>
-    <body>
-        <div class='header'>
-            <div class='title'>COMPROBANTE DE ENTREGA</div>
-            <div>Sistema de Gestión de Reclamos</div>
-        </div>
-        
-        <div class='info'>
-            <div class='info-row'>
-                <span class='info-label'>Código de Reclamo:</span>
-                <span>{comprobante.CodigoReclamo}</span>
-            </div>
-            <div class='info-row'>
-                <span class='info-label'>Cliente:</span>
-                <span>{comprobante.Cliente}</span>
-            </div>
-            <div class='info-row'>
-                <span class='info-label'>RUC:</span>
-                <span>{comprobante.Ruc}</span>
-            </div>
-            <div class='info-row'>
-                <span class='info-label'>Fecha de Entrega:</span>
-                <span>{comprobante.FechaEntrega:dd/MM/yyyy HH:mm}</span>
-            </div>
-            <div class='info-row'>
-                <span class='info-label'>Personal de Entrega:</span>
-                <span>{comprobante.PersonalEntrega}</span>
-            </div>
-        </div>
-        
-        <h3>Productos Entregados</h3>
-        <table class='table'>
-            <thead>
-                <tr>
-                    <th>Producto Defectuoso</th>
-                    <th>Marca</th>
-                    <th>Modelo</th>
-                    <th>Producto de Reemplazo</th>
-                </tr>
-            </thead>
-            <tbody>
-                {string.Join("", comprobante.Productos.Select(p => $@"
-                <tr>
-                    <td>{p.NumeroSerieDefectuoso}</td>
-                    <td>{p.Marca}</td>
-                    <td>{p.Modelo}</td>
-                    <td>{p.NumeroSerieReemplazo}</td>
-                </tr>"))}
-            </tbody>
-        </table>
-        
-        <div class='footer'>
-            <div class='signature'>
-                <p>___________________________________</p>
-                <p>Firma del Cliente</p>
-                <p>Nombre: ___________________________</p>
-                <p>Cédula/RUC: ______________________</p>
-                <p>Fecha: ____________________________</p>
-            </div>
-        </div>
-    </body>
-    </html>";
-        }
-
-        private async Task GenerarPdfDesdeHtml(string htmlContent, string rutaSalida)
-        {
-            try
-            {
-                // Opción 1: Usar una librería como DinkToPdf (instala el paquete NuGet)
-                // Opción 2: Usar PuppeteerSharp (instala el paquete NuGet)
-                // Opción 3: Para desarrollo, crear un archivo HTML temporal
-
-                // Para solución temporal, crear un archivo HTML que puedas convertir manualmente
-                var htmlPath = rutaSalida.Replace(".pdf", ".html");
-                await File.WriteAllTextAsync(htmlPath, htmlContent);
-
-                _logger.LogInformation($"HTML generado en: {htmlPath}. Para producción, instala una librería de generación de PDFs.");
-
-                // En producción, descomenta y configura una librería de PDF:
-                // using var converter = new BasicConverter(new PdfTools());
-                // var doc = new HtmlToPdfDocument { GlobalSettings, Objects };
-                // var pdf = converter.Convert(doc);
-                // await File.WriteAllBytesAsync(rutaSalida, pdf);
-
-                // Para desarrollo, copiar un PDF de ejemplo
-                var pdfEjemplo = Path.Combine(Directory.GetCurrentDirectory(), "Documents", "reclamos", "REC-20251231-2C73C3D0.pdf");
-                if (File.Exists(pdfEjemplo))
-                {
-                    File.Copy(pdfEjemplo, rutaSalida, true);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al generar PDF desde HTML");
-                throw;
-            }
-        }
-
-
         public async Task<bool> SubirComprobanteAsync(SubirComprobanteRequest request, int personalEntregaId)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 _logger.LogInformation($"Subiendo comprobante para reclamo: {request.CodigoReclamo}");
+
+                // Verificar que el base64 no esté vacío
+                if (string.IsNullOrWhiteSpace(request.PdfBase64))
+                {
+                    throw new InvalidOperationException("El PDF firmado es requerido");
+                }
 
                 var reclamo = await _context.Reclamos
                     .Include(r => r.ReclamosProductoSns)
@@ -552,22 +472,20 @@ namespace Infrastructure.Services
                     throw new InvalidOperationException("No se encontró comprobante para actualizar");
                 }
 
-                // Guardar el PDF en el sistema de archivos
-                var nombreArchivo = $"Comprobante_Firmado_{request.CodigoReclamo}_{DateTime.Now:yyyyMMddHHmmss}.pdf";
-                var rutaArchivo = $"/Documents/entrega/firmados/{nombreArchivo}";
+                // Convertir base64 a bytes
+                var pdfBytes = Convert.FromBase64String(request.PdfBase64);
+
+                // Crear nombre único para el archivo
+                var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                var nombreArchivo = $"Comprobante_Firmado_{request.CodigoReclamo}_{timestamp}.pdf";
+                var rutaCompleta = Path.Combine(_entregaDocumentsPath, nombreArchivo);
+
+                // Guardar el archivo
+                await File.WriteAllBytesAsync(rutaCompleta, pdfBytes);
 
                 // Actualizar el comprobante existente con el PDF firmado
-                comprobanteExistente.PdfComprobanteEntregaCliente = rutaArchivo;
-
-                // Actualizar el PDF de cada producto reclamado si es necesario
-                foreach (var productoReclamado in reclamo.ReclamosProductoSns)
-                {
-                    if (productoReclamado.ComprobanteProductoReemplazado != null)
-                    {
-                        // Asegurar que todos apunten al mismo comprobante
-                        productoReclamado.ComprobanteProductoReemplazado.FkComprobanteDeReemplazo = comprobanteExistente.Id;
-                    }
-                }
+                comprobanteExistente.PdfComprobanteEntregaCliente = $"/Documents/entrega/{nombreArchivo}";
+                comprobanteExistente.Estado = "Firmado";
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -582,6 +500,7 @@ namespace Infrastructure.Services
                 throw;
             }
         }
+
         public async Task<bool> ConfirmarEntregaAsync(ConfirmarEntregaRequest request, int personalEntregaId)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -591,11 +510,24 @@ namespace Infrastructure.Services
 
                 var reclamo = await _context.Reclamos
                     .Include(r => r.ReclamosProductoSns)
+                        .ThenInclude(rps => rps.ComprobanteProductoReemplazado)
+                            .ThenInclude(cpr => cpr.FkComprobanteDeReemplazoNavigation)
                     .FirstOrDefaultAsync(r => r.CodigoReclamo == request.CodigoReclamo);
 
                 if (reclamo == null)
                 {
                     throw new InvalidOperationException($"Reclamo no encontrado: {request.CodigoReclamo}");
+                }
+
+                // Verificar que el comprobante esté firmado
+                var comprobante = reclamo.ReclamosProductoSns
+                    .Where(rps => rps.ComprobanteProductoReemplazado != null)
+                    .Select(rps => rps.ComprobanteProductoReemplazado.FkComprobanteDeReemplazoNavigation)
+                    .FirstOrDefault();
+
+                if (comprobante == null || comprobante.Estado != "Firmado")
+                {
+                    throw new InvalidOperationException("El comprobante debe estar firmado antes de confirmar la entrega");
                 }
 
                 // Obtener productos aprobados para reemplazo
@@ -623,6 +555,12 @@ namespace Infrastructure.Services
                         // Cambiar estado del producto de reemplazo a "Entregado_Como_Reemplazo_Al_Cliente"
                         productoReemplazo.FkProductoDeReemplazoNavigation.EstadoInventario = "Entregado_Como_Reemplazo_Al_Cliente";
                     }
+                }
+
+                // Actualizar estado del comprobante
+                if (comprobante != null)
+                {
+                    comprobante.Estado = "Completado";
                 }
 
                 await _context.SaveChangesAsync();
@@ -669,6 +607,150 @@ namespace Infrastructure.Services
                 _logger.LogError(ex, $"Error al verificar reemplazos para reclamo: {codigoReclamo}");
                 throw;
             }
+        }
+    }
+
+    // Clase interna para generar el documento PDF con QuestPDF
+    internal class ComprobanteEntregaDocument : IDocument
+    {
+        private readonly ComprobanteEntregaDTO _comprobante;
+
+        public ComprobanteEntregaDocument(ComprobanteEntregaDTO comprobante)
+        {
+            _comprobante = comprobante;
+        }
+
+        public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
+
+        public void Compose(IDocumentContainer container)
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(50);
+                page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
+
+                // ENCABEZADO
+                page.Header()
+                    .Column(col =>
+                    {
+                        col.Item()
+                            .Text("COMPROBANTE DE ENTREGA")
+                            .Bold()
+                            .FontSize(20)
+                            .AlignCenter()
+                            .FontColor(Colors.Black);
+
+                        col.Item()
+                            .PaddingBottom(20)
+                            .Text("Sistema de Gestión de Reclamos")
+                            .FontSize(12)
+                            .AlignCenter()
+                            .FontColor(Colors.Grey.Darken1);
+                    });
+
+                // CONTENIDO
+                page.Content()
+                    .PaddingVertical(10)
+                    .Column(col =>
+                    {
+                        // INFORMACIÓN DEL RECLAMO
+                        col.Item()
+                            .Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(2);
+                                    columns.RelativeColumn(3);
+                                });
+
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text("Código de Reclamo:").Bold();
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text(_comprobante.CodigoReclamo);
+
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text("Cliente:").Bold();
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text(_comprobante.Cliente);
+
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text("RUC:").Bold();
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text(_comprobante.Ruc);
+
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text("Fecha de Entrega:").Bold();
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text(_comprobante.FechaEntrega.ToString("dd/MM/yyyy HH:mm"));
+
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text("Personal de Entrega:").Bold();
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten1).Text(_comprobante.PersonalEntrega);
+                            });
+
+                        col.Item().PaddingVertical(20);
+
+                        // TABLA DE PRODUCTOS
+                        col.Item()
+                            .PaddingBottom(10)
+                            .Element(e =>
+                            {
+                                e.Text("Productos Entregados")
+                                 .Bold()
+                                 .FontSize(14);
+                            });
+
+                        col.Item()
+                            .Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(); // Producto Defectuoso
+                                    columns.RelativeColumn(); // Marca
+                                    columns.RelativeColumn(); // Modelo
+                                    columns.RelativeColumn(); // Producto de Reemplazo
+                                });
+
+                                // ENCABEZADOS DE LA TABLA
+                                table.Header(header =>
+                                {
+                                    header.Cell().Background(Colors.Grey.Lighten3).Text("Producto Defectuoso").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Text("Marca").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Text("Modelo").Bold();
+                                    header.Cell().Background(Colors.Grey.Lighten3).Text("Producto de Reemplazo").Bold();
+                                });
+
+                                // FILAS DE PRODUCTOS
+                                foreach (var producto in _comprobante.Productos)
+                                {
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Text(producto.NumeroSerieDefectuoso);
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Text(producto.Marca);
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Text(producto.Modelo);
+                                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Text(producto.NumeroSerieReemplazo);
+                                }
+                            });
+
+                        col.Item().PaddingVertical(40);
+
+                        // FIRMA DEL CLIENTE
+                        col.Item()
+                            .BorderTop(1)
+                            .BorderColor(Colors.Black)
+                            .PaddingTop(20)
+                            .Column(firmaCol =>
+                            {
+                                firmaCol.Item()
+                                    .Text("___________________________________")
+                                    .AlignCenter();
+
+                                firmaCol.Item()
+                                    .PaddingTop(5)
+                                    .Text("Firma del Cliente")
+                                    .AlignCenter();
+                            });
+                    });
+
+                // PIE DE PÁGINA
+                page.Footer()
+                    .AlignCenter()
+                    .Text(text =>
+                    {
+                        text.Span("Generado el ").FontSize(9);
+                        text.Span(DateTime.Now.ToString("dd/MM/yyyy HH:mm")).FontSize(9);
+                    });
+            });
         }
     }
 }

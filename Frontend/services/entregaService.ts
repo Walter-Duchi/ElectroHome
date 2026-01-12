@@ -5,7 +5,6 @@ import {
     type ComprobanteEntregaDTO,
 } from '../src/types/entrega';
 
-
 export const entregaService = {
     // Buscar reclamo por código
     buscarReclamo: async (codigoReclamo: string): Promise<BuscarReclamoResponse> => {

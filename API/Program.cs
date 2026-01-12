@@ -14,6 +14,8 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using QuestPDF.Infrastructure;
+
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +26,8 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 builder.Logging.AddEventSourceLogger();
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
+QuestPDF.Settings.License = LicenseType.Community;
+
 
 // Aumentar verbosidad para todo
 builder.Services.AddLogging(logging =>
@@ -697,9 +701,8 @@ app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> 
     }
 }).AllowAnonymous();
 
-
 // ============================================
-// ENDPOINTS PARA PERSONAL DE ENTREGA
+// ENDPOINTS PARA PERSONAL DE ENTREGA (ACTUALIZADOS)
 // ============================================
 
 // Buscar reclamo para entrega
@@ -714,7 +717,7 @@ app.MapPost("/api/entrega/buscar-reclamo", [Authorize(Roles = "Personal de Entre
     {
         logger.LogInformation($"Buscando reclamo para entrega: {request.CodigoReclamo}");
         var response = await entregaService.BuscarReclamoAsync(request.CodigoReclamo);
-        return response.Exito ? Results.Ok(response) : Results.BadRequest(response);
+        return Results.Ok(response);
     }
     catch (Exception ex)
     {
@@ -747,7 +750,6 @@ app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de En
 });
 
 // Seleccionar producto de reemplazo
-// En el método de seleccionar reemplazo, agregar más logging:
 app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
     SeleccionarReemplazoRequest request,
     IEntregaService entregaService,
@@ -773,13 +775,6 @@ app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal d
     catch (Exception ex)
     {
         logger.LogError(ex, "=== ERROR: Seleccionar Reemplazo ===");
-        logger.LogError($"Mensaje: {ex.Message}");
-        logger.LogError($"StackTrace: {ex.StackTrace}");
-        if (ex.InnerException != null)
-        {
-            logger.LogError($"Inner Exception: {ex.InnerException.Message}");
-        }
-
         return Results.Problem(
             detail: $"Error interno: {ex.Message}",
             statusCode: StatusCodes.Status500InternalServerError,
@@ -903,7 +898,7 @@ app.MapPost("/api/entrega/confirmar-entrega", [Authorize(Roles = "Personal de En
     }
 });
 
-// Endpoint para servir PDFs (temporal)
+// Endpoint para servir PDFs de entrega
 app.MapGet("/Documents/entrega/{fileName}", async (string fileName, HttpContext context) =>
 {
     var filePath = Path.Combine(Directory.GetCurrentDirectory(), "Documents", "entrega", fileName);
