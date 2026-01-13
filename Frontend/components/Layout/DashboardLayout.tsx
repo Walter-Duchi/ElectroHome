@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Engineering } from '@mui/icons-material';
 import { LocalShipping } from '@mui/icons-material';
+import { Assignment } from '@mui/icons-material';
 
 import {
   AppBar,
@@ -227,6 +228,19 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               Crear Reclamo
             </Button>
           )}
+
+          {userRole === 'Cliente' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Assignment />}
+              onClick={() => navigate('/mis-reclamos')}
+              sx={{ mr: 2 }}
+            >
+              Mis Reclamos
+            </Button>
+          )}
+
 
           {userRole === 'Personal de Entrega' && (
             <Button

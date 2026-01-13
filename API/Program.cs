@@ -17,6 +17,7 @@ using System.Text;
 using QuestPDF.Infrastructure;
 
 using Microsoft.Extensions.FileProviders;
+using Application.DTOs.Cliente;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +95,7 @@ builder.Services.AddScoped<IBankAccountValidator, BankAccountValidator>();
 builder.Services.AddScoped<IReclamoService, ReclamoService>();
 builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 builder.Services.AddScoped<IEntregaService, EntregaService>();
+builder.Services.AddScoped<IClienteService, ClienteService>();
 
 builder.Services.AddCors(options =>
 {
@@ -912,6 +914,82 @@ app.MapGet("/Documents/entrega/{fileName}", async (string fileName, HttpContext 
 
     context.Response.ContentType = "application/pdf";
     await context.Response.SendFileAsync(filePath);
+});
+
+// ============================================
+// ENDPOINTS PARA CLIENTE DASHBOARD
+// ============================================
+
+// Obtener dashboard del cliente
+app.MapPost("/api/cliente/dashboard", [Authorize(Roles = "Cliente")] async (
+    ClienteDashboardRequest request,
+    IClienteService clienteService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var clienteId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation($"Obteniendo dashboard para cliente ID: {clienteId}");
+
+        var dashboard = await clienteService.ObtenerDashboardClienteAsync(clienteId, request);
+        return Results.Ok(dashboard);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error al obtener dashboard del cliente");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Obtener PDF en base64
+app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Cliente")] async (
+    string tipo,
+    string nombreArchivo,
+    IClienteService clienteService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        // Validar que el cliente tiene acceso a este PDF
+        var clienteId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+
+        // Construir ruta según tipo
+        var rutaBase = Path.Combine(Directory.GetCurrentDirectory(), "Documents");
+        string rutaPdf;
+
+        if (tipo == "tecnico")
+            rutaPdf = Path.Combine(rutaBase, "reclamos", nombreArchivo);
+        else if (tipo == "entrega")
+            rutaPdf = Path.Combine(rutaBase, "entrega", nombreArchivo);
+        else
+            return Results.BadRequest("Tipo de PDF no válido");
+
+        logger.LogInformation($"Solicitando PDF: {rutaPdf} para cliente ID: {clienteId}");
+
+        // Verificar que el archivo existe
+        if (!File.Exists(rutaPdf))
+        {
+            logger.LogWarning($"PDF no encontrado: {rutaPdf}");
+            return Results.NotFound("Archivo no encontrado");
+        }
+
+        // Obtener PDF en base64
+        var pdfBase64 = await clienteService.ObtenerPdfBase64Async(rutaPdf);
+
+        if (string.IsNullOrEmpty(pdfBase64))
+            return Results.NotFound("No se pudo leer el archivo");
+
+        return Results.Ok(new { pdfBase64, nombreArchivo });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error al obtener PDF: {tipo}/{nombreArchivo}");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
 });
 
 app.Run();
