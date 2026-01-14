@@ -254,12 +254,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
           )}
 
-          <IconButton color="inherit" sx={{ mr: 2 }}>
-            <Badge badgeContent={3} color="error">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-
           <IconButton onClick={handleMenuOpen} color="inherit">
             <AccountCircle />
           </IconButton>
