@@ -6,13 +6,11 @@ import LoginForm from '../components/Login/LoginForm';
 import ForgotPasswordForm from '../components/Login/ForgotPasswordForm';
 import ResetPasswordForm from '../components/Login/ResetPasswordForm';
 import DashboardLayout from '../components/Layout/DashboardLayout';
-import Dashboard from '../components/Dashboard/Dashboard';
 import CrearReclamo from '../components/Reclamo/CrearReclamo';
 import TecnicoDashboard from '../components/Tecnico/TecnicoDashboard';
 import RevisarProducto from '../components/Tecnico/RevisarProducto';
 import EntregaDashboard from '../components/Entrega/EntregaDashboard';
 import ClienteDashboard from '../components/Cliente/ClienteDashboard';
-
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -31,6 +29,30 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   }
 
   return <>{children}</>;
+};
+
+// Componente que decide qué mostrar en la ruta raíz según el rol
+const RoleBasedHome: React.FC = () => {
+  const { auth } = useAuth();
+
+  switch (auth.user?.rol) {
+    case 'Cliente':
+      return <ClienteDashboard />;
+    case 'Revisor':
+      return <CrearReclamo />;
+    case 'Tecnico':
+      return <TecnicoDashboard />;
+    case 'Personal de Entrega':
+      return <EntregaDashboard />;
+    default:
+      // Si no hay rol definido, mostrar una pantalla de error o redirigir
+      return (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <h2>Rol no reconocido</h2>
+          <p>Contacte al administrador del sistema.</p>
+        </Box>
+      );
+  }
 };
 
 const AppContent: React.FC = () => {
@@ -89,75 +111,32 @@ const AppContent: React.FC = () => {
           }
         />
 
-        {/* Rutas protegidas con DashboardLayout */}
+        {/* Ruta raíz: Muestra diferente contenido según el rol */}
         <Route
           path="/"
           element={
             <ProtectedRoute>
               <DashboardLayout>
-                <Dashboard />
+                <RoleBasedHome />
               </DashboardLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* Ruta para crear reclamos - Solo para Revisores */}
+        {/* Otras rutas específicas que pueden seguir existiendo */}
+        {/* Ruta para revisar producto específico - Solo para Técnicos */}
         <Route
-          path="/crear-reclamo"
+          path="/tecnico/revisar/:id"
           element={
-            <ProtectedRoute allowedRoles={['Revisor']}>
+            <ProtectedRoute allowedRoles={['Tecnico']}>
               <DashboardLayout>
-                <CrearReclamo />
+                <RevisarProducto />
               </DashboardLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* Ruta para dashboard del técnico */}
-        <Route
-            path="/tecnico"
-            element={
-                <ProtectedRoute allowedRoles={['Tecnico']}>
-                    <DashboardLayout>
-                        <TecnicoDashboard />
-                    </DashboardLayout>
-                </ProtectedRoute>
-            }
-        />
-
-        {/* Ruta para revisar producto específico */}
-        <Route
-            path="/tecnico/revisar/:id"
-            element={
-                <ProtectedRoute allowedRoles={['Tecnico']}>
-                    <DashboardLayout>
-                        <RevisarProducto />
-                    </DashboardLayout>
-                </ProtectedRoute>
-            }
-        />
-
-        <Route
-          path="/entrega"
-          element={
-            <ProtectedRoute allowedRoles={['Personal de Entrega']}>
-              <DashboardLayout>
-                <EntregaDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/mis-reclamos"
-          element={
-            <ProtectedRoute allowedRoles={['Cliente']}>
-              <DashboardLayout>
-                <ClienteDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+        {/* Puedes agregar más rutas específicas aquí si las necesitas */}
 
         {/* Ruta por defecto para cualquier otra ruta */}
         <Route path="*" element={<Navigate to="/" replace />} />

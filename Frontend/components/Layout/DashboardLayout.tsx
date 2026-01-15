@@ -9,17 +9,14 @@ import {
   AppBar,
   Box,
   CssBaseline,
-  Drawer,
   IconButton,
   Toolbar,
   Typography,
-  Avatar,
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
   Divider,
-  Badge,
   Button,
 } from '@mui/material';
 import {
@@ -38,8 +35,6 @@ import { useAuth } from '../../services/authContext';
 import { userService } from '../../services/userService';
 import CreateUserModal from '../Navbar/CreateUserModal';
 import { ThemeSelector } from '../ThemeSelector/ThemeSelector';
-
-const drawerWidth = 280;
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -73,10 +68,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   };
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
-
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
@@ -94,95 +85,17 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     return userRole && userRole !== 'Cliente' && allowedRoles.length > 0;
   };
 
-  const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ p: 3, textAlign: 'center', borderBottom: 1, borderColor: 'divider' }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-          CORPORATE SYSTEM
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Sistema de Gestión Empresarial
-        </Typography>
-      </Box>
-      
-      <Box sx={{ flexGrow: 1, p: 2 }}>
-        <Box sx={{ mb: 3, p: 2, bgcolor: 'action.selected', borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
-              {auth.user?.correo.charAt(0).toUpperCase()}
-            </Avatar>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                {auth.user?.correo}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {auth.user?.rol}
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 2 }} />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              p: 2,
-              borderRadius: 2,
-              bgcolor: 'primary.main',
-              color: 'white',
-            }}
-          >
-            <DashboardIcon />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Panel Principal
-            </Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, borderRadius: 2 }}>
-            <People />
-            <Typography variant="body2">Gestión de Usuarios</Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, borderRadius: 2 }}>
-            <Business />
-            <Typography variant="body2">Clientes</Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, borderRadius: 2 }}>
-            <Assessment />
-            <Typography variant="body2">Reportes</Typography>
-          </Box>
-        </Box>
-      </Box>
-
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Typography variant="caption" color="text.secondary">
-          v2.1.0 • Sistema Corporativo
-        </Typography>
-      </Box>
-    </Box>
-  );
-
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-        }}
+        
       >
         <Toolbar>
           <IconButton
             color="inherit"
-            aria-label="open drawer"
             edge="start"
-            onClick={handleDrawerToggle}
             sx={{ mr: 2, display: { sm: 'none' } }}
           >
             <MenuIcon />
@@ -302,36 +215,9 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{ flexShrink: { sm: 0 } }}
       >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: drawerWidth,
-            },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: drawerWidth,
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
+       
       </Box>
 
       <Box
@@ -339,7 +225,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
           mt: 8,
           backgroundColor: 'background.default',
           minHeight: '100vh',
