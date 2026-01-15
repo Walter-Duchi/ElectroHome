@@ -11,7 +11,7 @@ public partial class ReclamosProductoSn
 
     public int FkReclamos { get; set; }
 
-    public DateTime? FechaVentaClienteFinal { get; set; }
+    public DateTime FechaVentaClienteFinal { get; set; }
 
     public DateTime? FechaReclamoClienteFinal { get; set; }
 
