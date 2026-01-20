@@ -117,7 +117,7 @@ namespace Infrastructure.Services
                     Precio = r.Precio,
                     ClienteNombre = r.ClienteNombre,
                     ClienteRuc = r.ClienteRuc,
-                    FechaVentaClienteFinal = r.FechaVentaClienteFinal ?? DateTime.MinValue,
+                    FechaVentaClienteFinal = r.FechaVentaClienteFinal,
                     DiasGarantia = r.DiasGarantia,
                     GarantiaValida = CalcularGarantiaValida(r.FechaVentaClienteFinal, r.DiasGarantia)
                 }).ToList();
@@ -204,7 +204,7 @@ namespace Infrastructure.Services
                     Precio = queryResult.Precio,
                     ClienteNombre = queryResult.ClienteNombre,
                     ClienteRuc = queryResult.ClienteRuc,
-                    FechaVentaClienteFinal = queryResult.FechaVentaClienteFinal ?? DateTime.MinValue,
+                    FechaVentaClienteFinal = queryResult.FechaVentaClienteFinal,
                     DiasGarantia = queryResult.DiasGarantia,
                     GarantiaValida = CalcularGarantiaValida(queryResult.FechaVentaClienteFinal, queryResult.DiasGarantia)
                 };
