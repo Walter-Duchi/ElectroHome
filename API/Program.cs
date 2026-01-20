@@ -1,11 +1,4 @@
-using Application.DTOs.Auth;
-using Application.DTOs.Entrega;
-using Application.DTOs.Reclamo;
-using Application.DTOs.Tecnico;
-using Application.DTOs.User;
 using Infrastructure.Data;
-using Infrastructure.Interfaces;
-using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.StaticFiles;
@@ -17,7 +10,14 @@ using System.Text;
 using QuestPDF.Infrastructure;
 
 using Microsoft.Extensions.FileProviders;
-using Application.DTOs.Cliente;
+using Application.DTOs.Reclamos.Auth;
+using Application.DTOs.Reclamos.Entrega;
+using Application.DTOs.Reclamos.Tecnico;
+using Application.DTOs.Reclamos.Reclamo;
+using Application.DTOs.Reclamos.Cliente;
+using Application.DTOs.Reclamos.User;
+using Infrastructure.Reclamos.Services;
+using Infrastructure.Reclamos.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
