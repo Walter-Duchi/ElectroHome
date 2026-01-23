@@ -13,6 +13,10 @@ public partial class VentasPorNumeroSerieProducto
 
     public decimal PrecioVenta { get; set; }
 
+    public decimal? Descuento { get; set; }
+
+    public decimal Iva { get; set; }
+
     public virtual NumeroSerieProducto FkNumeroSerieProductoNavigation { get; set; } = null!;
 
     public virtual Venta FkVentasNavigation { get; set; } = null!;
