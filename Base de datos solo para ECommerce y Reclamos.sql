@@ -59,7 +59,7 @@ CREATE TABLE Usuarios(
     Fecha_Creacion DATETIME DEFAULT GETDATE() NOT NULL,
     Num_Cuenta_Bancaria VARCHAR(30) NULL DEFAULT NULL, 
     Tipo_Cuenta_Bancaria VARCHAR(20) NULL CHECK(Tipo_Cuenta_Bancaria IN ('Ahorro', 'Corriente')),
-    Activo BIT DEFAULT 1,
+    Activo BIT DEFAULT 1 NOT NULL,
     Contribuyente_Especial BIT DEFAULT 0 NOT NULL,
     Obligado_Contabilidad BIT DEFAULT 0 NOT NULL,
     Creado_Por INT REFERENCES Usuarios(Id)

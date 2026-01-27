@@ -1,14 +1,21 @@
 export interface CreateUserRequest {
     nombres: string;
     apellidos: string;
+    razonSocial?: string;
+    tipoIdentificacion: 'Cedula' | 'Pasaporte';
+    identificacion: string;
+    ruc?: string;
     correo: string;
-    contrasena: string;
     celular: string;
     convencional?: string;
-    ruc: string;
+    ciudad: string;
+    codigoPostal: string;
+    direccion: string;
     rol: string;
-    numCuentaBancaria?: string;
-    tipoCuentaBancaria?: string;  // Nuevo campo
+    numCuentaBancaria: string;
+    tipoCuentaBancaria: 'Ahorro' | 'Corriente';
+    contribuyenteEspecial: boolean;
+    obligadoContabilidad: boolean;
 }
 
 export interface CreateUserResponse {
@@ -19,6 +26,8 @@ export interface CreateUserResponse {
     celular: string;
     rol: string;
     fechaCreacion: string;
+    contrasenaGenerada: string;
+    mensaje: string;
 }
 
 export interface AllowedRolesResponse {

@@ -9,5 +9,7 @@
         public string Celular { get; set; } = null!;
         public string Rol { get; set; } = null!;
         public DateTime FechaCreacion { get; set; }
+        public string ContrasenaGenerada { get; set; } = null!;
+        public string Mensaje { get; set; } = null!;
     }
 }

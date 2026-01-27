@@ -4,7 +4,7 @@ import { type CreateUserRequest, type CreateUserResponse } from '../src/types/us
 export const userService = {
     async createUser(userData: CreateUserRequest): Promise<CreateUserResponse> {
         try {
-            const response = await api.post<CreateUserResponse>('/users/create', userData);
+            const response = await api.post<CreateUserResponse>('/admin/crear-usuario', userData);
             return response.data;
         } catch (error: any) {
             if (error.response?.data?.message) {
@@ -14,32 +14,51 @@ export const userService = {
         }
     },
 
-    async getAllowedRoles(): Promise<string[]> {
+    async getAdminAllowedRoles(): Promise<string[]> {
         try {
-            const response = await api.get<string[]>('/users/allowed-roles');
+            const response = await api.get<string[]>('/admin/roles-permitidos');
             return response.data;
         } catch (error) {
-            console.error('Error al obtener roles permitidos:', error);
+            console.error('Error al obtener roles permitidos para administrador:', error);
             return [];
         }
     },
 
-    validateBankAccount(accountNumber: string): boolean {
-        if (!accountNumber) return false;
-
-        // Limpiar el número de cuenta
-        const cleaned = accountNumber.replace(/\D/g, '');
-
-        // Validar longitud (10-20 dígitos para cuentas bancarias)
-        if (cleaned.length < 10 || cleaned.length > 20) {
+    validateCedula(cedula: string): boolean {
+        if (!cedula || cedula.length !== 10 || !/^\d+$/.test(cedula)) {
             return false;
         }
 
-        // Validar que solo contenga dígitos
-        return /^\d+$/.test(cleaned);
+        // Algoritmo módulo 10 para cédula ecuatoriana
+        const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+        let total = 0;
+
+        for (let i = 0; i < 9; i++) {
+            let valor = parseInt(cedula[i]) * coeficientes[i];
+            if (valor >= 10) valor -= 9;
+            total += valor;
+        }
+
+        let digitoVerificador = total % 10;
+        if (digitoVerificador !== 0) {
+            digitoVerificador = 10 - digitoVerificador;
+        }
+
+        return digitoVerificador === parseInt(cedula[9]);
+    },
+
+    validateBankAccount(accountNumber: string): boolean {
+        if (!accountNumber) return false;
+        const cleaned = accountNumber.replace(/\D/g, '');
+        return cleaned.length >= 10 && cleaned.length <= 20 && /^\d+$/.test(cleaned);
     },
 
     validateAccountType(accountType: string): boolean {
         return accountType === 'Ahorro' || accountType === 'Corriente';
+    },
+
+    validatePostalCode(codigoPostal: string): boolean {
+        // Validar que sea un código postal válido para Guayaquil (6 dígitos)
+        return /^\d{6}$/.test(codigoPostal);
     }
 };

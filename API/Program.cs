@@ -343,58 +343,53 @@ app.MapPost("/api/auth/reset-password", async (ResetPasswordRequest request, IAu
 })
 .AllowAnonymous();
 
-app.MapPost("/api/users/create", [Authorize] async (CreateUserRequest request, IUserService userService, HttpContext httpContext) =>
+//CREAR USUARIO COMO ADMINISTRADOR
+app.MapGet("/api/admin/roles-permitidos", [Authorize(Roles = "Administrador")] () =>
 {
+    var rolesPermitidos = new List<string>
+    {
+        "Revisor", "Tecnico", "Personal de Entrega", "Vendedor",
+        "Analista_Datos", "Encargado_Inventario", "Gestor_Productos", "Administrador"
+    };
+
+    return Results.Ok(rolesPermitidos);
+});
+
+app.MapPost("/api/admin/crear-usuario", [Authorize(Roles = "Administrador")] async (
+    CreateUserRequest request,
+    IUserService userService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+
     try
     {
-        var userRole = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
+        logger.LogInformation("=== INICIO: Crear Usuario (Administrador) ===");
+        logger.LogInformation($"Solicitud: {System.Text.Json.JsonSerializer.Serialize(request)}");
 
-        if (string.IsNullOrEmpty(userRole))
-            return Results.Unauthorized();
+        // Obtener ID del administrador que crea el usuario
+        var administradorId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation($"Administrador ID: {administradorId} creando usuario");
 
-        var response = await userService.CreateUserAsync(request, userRole);
+        // Crear el usuario
+        var response = await userService.CreateUserAsync(request, administradorId);
+
+        logger.LogInformation("=== ÉXITO: Usuario creado ===");
         return Results.Ok(response);
-    }
-    catch (UnauthorizedAccessException ex)
-    {
-        return Results.Forbid();
     }
     catch (ArgumentException ex)
     {
+        logger.LogWarning($"Error de validación: {ex.Message}");
         return Results.BadRequest(new { message = ex.Message });
     }
     catch (Exception ex)
     {
-        return Results.Problem($"Error interno del servidor: {ex.Message}");
+        logger.LogError(ex, "=== ERROR: Crear Usuario ===");
+        return Results.Problem(
+            detail: $"Error interno: {ex.Message}",
+            statusCode: StatusCodes.Status500InternalServerError,
+            title: "Error del servidor");
     }
-});
-
-app.MapGet("/api/users/allowed-roles", [Authorize] (IUserService userService, HttpContext httpContext) =>
-{
-    var userRole = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
-
-    if (string.IsNullOrEmpty(userRole))
-        return Results.Unauthorized();
-
-    var allowedRoles = new List<string>();
-
-    switch (userRole)
-    {
-        case "Revisor":
-            allowedRoles = new List<string> { "Cliente", "Revisor" };
-            break;
-        case "Tecnico":
-            allowedRoles = new List<string> { "Tecnico" };
-            break;
-        case "Personal de Entrega":
-            allowedRoles = new List<string> { "Personal de Entrega" };
-            break;
-        default:
-            allowedRoles = new List<string>();
-            break;
-    }
-
-    return Results.Ok(allowedRoles);
 });
 
 // Endpoints para reclamos
@@ -993,3 +988,60 @@ app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Client
 });
 
 app.Run();
+
+/*
+app.MapPost("/api/users/create", [Authorize] async (CreateUserRequest request, IUserService userService, HttpContext httpContext) =>
+{
+    try
+    {
+        var userRole = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (string.IsNullOrEmpty(userRole))
+            return Results.Unauthorized();
+
+        var creadoPorId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var response = await userService.CreateUserAsync(request, creadoPorId);
+        return Results.Ok(response);
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Results.Forbid();
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error interno del servidor: {ex.Message}");
+    }
+});
+
+app.MapGet("/api/users/allowed-roles", [Authorize] (IUserService userService, HttpContext httpContext) =>
+{
+    var userRole = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
+
+    if (string.IsNullOrEmpty(userRole))
+        return Results.Unauthorized();
+
+    var allowedRoles = new List<string>();
+
+    switch (userRole)
+    {
+        case "Revisor":
+            allowedRoles = new List<string> { "Cliente", "Revisor" };
+            break;
+        case "Tecnico":
+            allowedRoles = new List<string> { "Tecnico" };
+            break;
+        case "Personal de Entrega":
+            allowedRoles = new List<string> { "Personal de Entrega" };
+            break;
+        default:
+            allowedRoles = new List<string>();
+            break;
+    }
+
+    return Results.Ok(allowedRoles);
+});
+*/

@@ -4,7 +4,7 @@ namespace Infrastructure.Reclamos.Interfaces
 {
     public interface IUserService
     {
-        Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, string currentUserRole);
+        Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, int creadoPorId);
         Task<bool> CanCreateRole(string creatorRole, string targetRole);
     }
 }

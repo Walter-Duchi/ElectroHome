@@ -1,10 +1,5 @@
-import { AddReaction as AddReclamoIcon } from '@mui/icons-material';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Engineering } from '@mui/icons-material';
-import { LocalShipping } from '@mui/icons-material';
-import { Assignment } from '@mui/icons-material';
-
 import {
   AppBar,
   Box,
@@ -18,6 +13,8 @@ import {
   ListItemText,
   Divider,
   Button,
+  Badge,
+  Tooltip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -25,14 +22,17 @@ import {
   AccountCircle,
   Settings,
   ExitToApp,
-  Dashboard as DashboardIcon,
   People,
-  Business,
-  Assessment,
   Add,
+  Engineering,
+  LocalShipping,
+  Assignment,
+  Receipt,
+  Analytics,
+  Inventory,
+  ShoppingCart,
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
-import { userService } from '../../services/userService';
 import CreateUserModal from '../Navbar/CreateUserModal';
 import { ThemeSelector } from '../ThemeSelector/ThemeSelector';
 
@@ -42,31 +42,9 @@ interface DashboardLayoutProps {
 
 function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
-
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [loadingRoles, setLoadingRoles] = useState(false);
   const { auth, logout, userRole } = useAuth();
-
-  useEffect(() => {
-    if (auth.isAuthenticated && userRole && userRole !== 'Cliente') {
-      loadAllowedRoles();
-    }
-  }, [auth.isAuthenticated, userRole]);
-
-  const loadAllowedRoles = async () => {
-    try {
-      setLoadingRoles(true);
-      const roles = await userService.getAllowedRoles();
-      setAllowedRoles(roles);
-    } catch (error) {
-      console.error('Error loading allowed roles:', error);
-    } finally {
-      setLoadingRoles(false);
-    }
-  };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -82,16 +60,38 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   const canCreateUsers = () => {
-    return userRole && userRole !== 'Cliente' && allowedRoles.length > 0;
+    return userRole === 'Administrador';
+  };
+
+  const getDashboardTitle = () => {
+    switch (userRole) {
+      case 'Administrador':
+        return 'Panel de Administración';
+      case 'Revisor':
+        return 'Panel de Revisión';
+      case 'Tecnico':
+        return 'Panel Técnico';
+      case 'Personal de Entrega':
+        return 'Panel de Entregas';
+      case 'Vendedor':
+        return 'Panel de Ventas';
+      case 'Analista_Datos':
+        return 'Panel de Análisis';
+      case 'Encargado_Inventario':
+        return 'Panel de Inventario';
+      case 'Gestor_Productos':
+        return 'Panel de Productos';
+      case 'Cliente':
+        return 'Mi Panel de Cliente';
+      default:
+        return 'Sistema de Gestión';
+    }
   };
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
-      <AppBar
-        position="fixed"
-        
-      >
+      <AppBar position="fixed">
         <Toolbar>
           <IconButton
             color="inherit"
@@ -100,41 +100,42 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Sistema de Gestión
+            {getDashboardTitle()}
           </Typography>
 
           {canCreateUsers() && (
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<Add />}
-              onClick={() => setShowCreateModal(true)}
-              disabled={loadingRoles}
-              sx={{ mr: 2 }}
-            >
-              Crear Usuario
-            </Button>
+            <Tooltip title="Crear nuevo usuario">
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<Add />}
+                onClick={() => setShowCreateModal(true)}
+                sx={{ mr: 2 }}
+              >
+                Crear Usuario
+              </Button>
+            </Tooltip>
           )}
 
           {userRole === 'Tecnico' && (
-          <Button
+            <Button
               variant="contained"
               color="primary"
               startIcon={<Engineering />}
               onClick={() => navigate('/tecnico')}
               sx={{ mr: 2 }}
-          >
+            >
               Mis Revisiones
-          </Button>
+            </Button>
           )}
 
           {userRole === 'Revisor' && (
             <Button
               variant="contained"
               color="primary"
-              startIcon={<AddReclamoIcon />}
+              startIcon={<Receipt />}
               onClick={() => navigate('/crear-reclamo')}
               sx={{ mr: 2 }}
             >
@@ -154,7 +155,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
           )}
 
-
           {userRole === 'Personal de Entrega' && (
             <Button
               variant="contained"
@@ -166,6 +166,44 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               Procesar Entregas
             </Button>
           )}
+
+          {userRole === 'Vendedor' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<ShoppingCart />}
+              onClick={() => navigate('/ventas')}
+              sx={{ mr: 2 }}
+            >
+              Ventas
+            </Button>
+          )}
+
+          {userRole === 'Analista_Datos' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Analytics />}
+              onClick={() => navigate('/analisis')}
+              sx={{ mr: 2 }}
+            >
+              Análisis
+            </Button>
+          )}
+
+          {userRole === 'Encargado_Inventario' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Inventory />}
+              onClick={() => navigate('/inventario')}
+              sx={{ mr: 2 }}
+            >
+              Inventario
+            </Button>
+          )}
+
+          
 
           <IconButton onClick={handleMenuOpen} color="inherit">
             <AccountCircle />
@@ -192,19 +230,19 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           </ListItemIcon>
           <ListItemText>Mi Perfil</ListItemText>
         </MenuItem>
-        
+
         {/* Selector de tema como ítem de menú */}
         <ThemeSelector variant="menu-item" />
-        
+
         <MenuItem onClick={handleMenuClose}>
           <ListItemIcon>
             <Settings fontSize="small" />
           </ListItemIcon>
           <ListItemText>Configuración</ListItemText>
         </MenuItem>
-        
+
         <Divider />
-        
+
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>
             <ExitToApp fontSize="small" />
@@ -213,12 +251,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
         </MenuItem>
       </Menu>
 
-      <Box
-        component="nav"
-        sx={{ flexShrink: { sm: 0 } }}
-      >
-       
-      </Box>
 
       <Box
         component="main"
@@ -235,9 +267,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {showCreateModal && (
         <CreateUserModal
-          allowedRoles={allowedRoles}
           onClose={() => setShowCreateModal(false)}
-          currentUserRole={userRole || ''}
         />
       )}
     </Box>

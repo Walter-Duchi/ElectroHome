@@ -11,63 +11,62 @@ namespace Infrastructure.Reclamos.Services
     public class UserService : IUserService
     {
         private readonly ReclamosContext _context;
-        private readonly IBankAccountValidator _accountValidator;
 
-        public UserService(ReclamosContext context, IBankAccountValidator accountValidator)
+        public UserService(ReclamosContext context)
         {
             _context = context;
-            _accountValidator = accountValidator;
         }
 
-        public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, string currentUserRole)
+        public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, int creadoPorId)
         {
-            if (!CanCreateRole(currentUserRole, request.Rol))
-                throw new UnauthorizedAccessException($"No tienes permiso para crear usuarios con rol {request.Rol}");
-
+            // Validar que el correo no exista
             if (await _context.Usuarios.AnyAsync(u => u.Correo == request.Correo))
                 throw new ArgumentException("El correo ya está registrado");
 
-            if (await _context.Usuarios.AnyAsync(u => u.Ruc == request.RUC))
+            // Validar que la identificación no exista
+            if (await _context.Usuarios.AnyAsync(u => u.Identificacion == request.Identificacion))
+                throw new ArgumentException("La identificación ya está registrada");
+
+            // Validar RUC si se proporciona
+            if (!string.IsNullOrEmpty(request.RUC) && await _context.Usuarios.AnyAsync(u => u.Ruc == request.RUC))
                 throw new ArgumentException("El RUC ya está registrado");
 
-            if (!IsValidRol(request.Rol))
-                throw new ArgumentException($"Rol inválido: {request.Rol}");
+            // Validar cédula ecuatoriana si el tipo es Cédula
+            if (request.TipoIdentificacion == "Cedula" && !ValidarCedulaEcuatoriana(request.Identificacion))
+                throw new ArgumentException("La cédula ecuatoriana no es válida");
 
-            // Validación para clientes
-            if (request.Rol == "Cliente")
-            {
-                if (string.IsNullOrWhiteSpace(request.NumCuentaBancaria))
-                    throw new ArgumentException("El número de cuenta bancaria es obligatorio para clientes");
+            // Generar contraseña aleatoria segura
+            var contrasenaGenerada = GenerarContrasenaSegura();
 
-                if (!_accountValidator.ValidateBankAccount(request.NumCuentaBancaria))
-                    throw new ArgumentException("El número de cuenta bancaria no es válido");
+            // Hashear la contraseña
+            var contrasenaHash = HashPassword(contrasenaGenerada);
 
-                if (string.IsNullOrWhiteSpace(request.TipoCuentaBancaria))
-                    throw new ArgumentException("El tipo de cuenta bancaria es obligatorio para clientes");
-
-                if (!_accountValidator.ValidateAccountType(request.TipoCuentaBancaria))
-                    throw new ArgumentException("El tipo de cuenta bancaria debe ser 'Ahorro' o 'Corriente'");
-            }
-            else
-            {
-                // Para otros roles, no se guarda información bancaria
-                request.NumCuentaBancaria = null;
-                request.TipoCuentaBancaria = null;
-            }
-
+            // Crear el usuario
             var usuario = new Usuario
             {
                 Nombres = request.Nombres,
                 Apellidos = request.Apellidos,
+                RazonSocial = request.RazonSocial,
+                TipoIdentificacion = request.TipoIdentificacion,
+                Identificacion = request.Identificacion,
+                Ruc = request.RUC,
                 Correo = request.Correo,
-                Contrasena = HashPassword(request.Contrasena),
+                Contrasena = contrasenaHash,
                 Celular = request.Celular,
                 Convencional = request.Convencional,
-                Ruc = request.RUC,
+                Pais = "Ecuador",
+                DivisionAdministrativa = "Guayas",
+                Ciudad = request.Ciudad,
+                CodigoPostal = request.CodigoPostal,
+                Direccion = request.Direccion,
                 Rol = request.Rol,
                 FechaCreacion = DateTime.UtcNow,
                 NumCuentaBancaria = request.NumCuentaBancaria,
-                TipoCuentaBancaria = request.TipoCuentaBancaria
+                TipoCuentaBancaria = request.TipoCuentaBancaria,
+                Activo = true,
+                ContribuyenteEspecial = request.ContribuyenteEspecial,
+                ObligadoContabilidad = request.ObligadoContabilidad,
+                CreadoPor = creadoPorId
             };
 
             _context.Usuarios.Add(usuario);
@@ -81,31 +80,66 @@ namespace Infrastructure.Reclamos.Services
                 Correo = usuario.Correo,
                 Celular = usuario.Celular,
                 Rol = usuario.Rol,
-                FechaCreacion = usuario.FechaCreacion
+                FechaCreacion = usuario.FechaCreacion,
+                ContrasenaGenerada = contrasenaGenerada,
+                Mensaje = "Usuario creado exitosamente. Guarde esta contraseña para proporcionarla al empleado."
             };
         }
 
-        public bool CanCreateRole(string creatorRole, string targetRole)
+        private bool ValidarCedulaEcuatoriana(string cedula)
         {
-            return creatorRole switch
+            if (cedula.Length != 10 || !cedula.All(char.IsDigit))
+                return false;
+
+            int[] coeficientes = { 2, 1, 2, 1, 2, 1, 2, 1, 2 };
+            int total = 0;
+
+            for (int i = 0; i < 9; i++)
             {
-                "Revisor" => targetRole == "Cliente" || targetRole == "Revisor",
-                "Tecnico" => targetRole == "Tecnico",
-                "Personal de Entrega" => targetRole == "Personal de Entrega",
-                _ => false
-            };
+                int valor = int.Parse(cedula[i].ToString()) * coeficientes[i];
+                if (valor >= 10)
+                    valor -= 9;
+                total += valor;
+            }
+
+            int digitoVerificador = total % 10;
+            if (digitoVerificador != 0)
+                digitoVerificador = 10 - digitoVerificador;
+
+            return digitoVerificador == int.Parse(cedula[9].ToString());
         }
 
-        private bool IsValidRol(string rol)
+        private string GenerarContrasenaSegura()
         {
-            return rol switch
+            const string mayusculas = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const string minusculas = "abcdefghijklmnopqrstuvwxyz";
+            const string numeros = "0123456789";
+            const string especiales = "@$!%*?&";
+            const string todosCaracteres = mayusculas + minusculas + numeros + especiales;
+
+            var random = new Random();
+            var passwordChars = new char[12];
+
+            // Asegurar al menos un carácter de cada tipo
+            passwordChars[0] = mayusculas[random.Next(mayusculas.Length)];
+            passwordChars[1] = minusculas[random.Next(minusculas.Length)];
+            passwordChars[2] = numeros[random.Next(numeros.Length)];
+            passwordChars[3] = especiales[random.Next(especiales.Length)];
+
+            // Completar el resto de la contraseña
+            for (int i = 4; i < 12; i++)
             {
-                "Cliente" => true,
-                "Revisor" => true,
-                "Tecnico" => true,
-                "Personal de Entrega" => true,
-                _ => false
-            };
+                passwordChars[i] = todosCaracteres[random.Next(todosCaracteres.Length)];
+            }
+
+            // Mezclar los caracteres
+            for (int i = 0; i < 12; i++)
+            {
+                int randomIndex = random.Next(i, 12);
+                (passwordChars[i], passwordChars[randomIndex]) = (passwordChars[randomIndex], passwordChars[i]);
+            }
+
+            return new string(passwordChars);
         }
 
         private byte[] HashPassword(string password)
@@ -114,9 +148,20 @@ namespace Infrastructure.Reclamos.Services
             return sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
         }
 
-        Task<bool> IUserService.CanCreateRole(string creatorRole, string targetRole)
+        public Task<bool> CanCreateRole(string creatorRole, string targetRole)
         {
-            return Task.FromResult(CanCreateRole(creatorRole, targetRole));
+            // Solo el administrador puede crear usuarios
+            if (creatorRole != "Administrador")
+                return Task.FromResult(false);
+
+            // Roles que el administrador puede crear
+            var rolesPermitidos = new List<string>
+            {
+                "Revisor", "Tecnico", "Personal de Entrega", "Vendedor",
+                "Analista_Datos", "Encargado_Inventario", "Gestor_Productos", "Administrador"
+            };
+
+            return Task.FromResult(rolesPermitidos.Contains(targetRole));
         }
     }
 }

@@ -41,6 +41,10 @@ namespace Infrastructure.Reclamos.Services
             if (usuario == null)
                 throw new UnauthorizedAccessException("Credenciales incorrectas");
 
+            // Verificar si el usuario está activo
+            if (!usuario.Activo)
+                throw new UnauthorizedAccessException("Cuenta desactivada o eliminada");
+
             // Calcular hash SHA256 de la contraseña proporcionada
             using var sha256 = SHA256.Create();
             var inputBytes = Encoding.UTF8.GetBytes(request.Contrasena);

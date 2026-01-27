@@ -45,7 +45,7 @@ public partial class Usuario
 
     public string? TipoCuentaBancaria { get; set; }
 
-    public bool? Activo { get; set; }
+    public bool Activo { get; set; }
 
     public bool ContribuyenteEspecial { get; set; }
 

@@ -17,19 +17,23 @@ export const authService = {
             }
 
             return response.data;
-        } catch (error) {
-            if (
-                typeof error === 'object' &&
-                error !== null &&
-                'response' in error &&
-                (error as { response?: { status?: number } }).response?.status === 401
-            ) {
+        } catch (error: any) {
+            if (error.response?.status === 401) {
+                const errorMessage = error.response?.data?.message || error.response?.data;
+
+                if (errorMessage.includes('desactivada') || errorMessage.includes('inactiva')) {
+                    throw new Error('Cuenta desactivada. Contacte al administrador.');
+                }
+
                 throw new Error('Credenciales incorrectas');
+            }
+
+            if (error.response?.status === 400) {
+                throw new Error('Datos de inicio de sesión inválidos');
             }
 
             throw new Error('Error en el servidor. Intente nuevamente.');
         }
-
     },
 
     logout(): void {
