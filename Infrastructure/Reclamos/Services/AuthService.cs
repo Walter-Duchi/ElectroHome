@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Reclamos.Auth;
+﻿using Application.DTOs.Auth;
 using Infrastructure.Data;
 using Infrastructure.Models;
 using Infrastructure.Reclamos.Interfaces;

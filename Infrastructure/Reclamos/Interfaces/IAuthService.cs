@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Reclamos.Auth;
+﻿using Application.DTOs.Auth;
 
 namespace Infrastructure.Reclamos.Interfaces
 {

@@ -1,4 +1,4 @@
-﻿namespace Application.DTOs.Reclamos.Auth
+﻿namespace Application.DTOs.Auth
 {
     public class LoginResponse
     {

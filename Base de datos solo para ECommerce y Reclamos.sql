@@ -17,17 +17,6 @@ GO
 USE Reclamos;
 GO
 
-CREATE TABLE Ubicaciones_Geograficas (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    Codigo VARCHAR(10) UNIQUE NOT NULL,
-    Nombre VARCHAR(100) NOT NULL,
-    Tipo VARCHAR(20) CHECK (Tipo IN ('Pais', 'Provincia', 'Ciudad', 'Parroquia')),
-    FK_Padre INT REFERENCES Ubicaciones_Geograficas(Id),
-    Codigo_Postal VARCHAR(20),
-    Zona_Horaria VARCHAR(50)
-);
-GO
-
 -- Tabla de Usuarios
 CREATE TABLE Usuarios(
     Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -41,30 +30,39 @@ CREATE TABLE Usuarios(
     Contrasena VARBINARY(256) NOT NULL,
     Celular VARCHAR(15) NOT NULL,
     Convencional VARCHAR(15),
-    Direccion VARCHAR(500),
-    Ciudad VARCHAR(100),
+    Pais VARCHAR(50), --Ecuador, USA
+    Division_administrativa VARCHAR(50), --Guayas, California
+    Ciudad VARCHAR(50), --Guayaquil, Los Angeles
+    Codigo_Postal VARCHAR(20), --codigo
+    Direccion VARCHAR(500), --direccion domiciliaria
     Rol VARCHAR(50) NOT NULL CHECK (
         Rol IN (
-            'Cliente', --Cliente Persona Natural
-            'Revisor',
-            'Tecnico',
-            'Personal de Entrega',
-            'Cliente_Juridico', --Cliente Persona Juridico
-            'Vendedor',
-            'Analista_Datos',
-            'Encargado_Inventario',
-            'Atencion_Cliente',
-            'Gestor_Productos',
-            'Administrador'
+            'Cliente', --Cliente Persona Natural segun el SRI, es aquella persona comun que compra para si mismo o es un emprendedor. 
+            --Puede crear su propia cuenta desde cero o partiendo de datos que ya se halla guardado de este al momento de compras pasadas.
+            'Revisor', --Puede crear reclamos de productos defectuoso, 
+            -- este tambien puede probar los productos nuevos que esta comprando el usuario para ver su funcionamiento. Funciona como atencion al cliente
+            'Tecnico', --Revisa los productos defectuosos y aprueba a reprueba individualmente cada producto unicamente de marcas que este este certificado
+            'Personal de Entrega', --Es el que entrega los productos de reemplazo al cliente
+            'Cliente_Juridico', --Cliente Persona Juridico segun el SRI, es una empresa grande que compra volumenes mayores que los clientes Persona Natural y
+            -- como obtiene mayores ganancias se le exige evidiencia valida que demuestre su crecimiento totalmente licito y legal. 
+            --Puede crear su propia cuenta desde cero o partiendo de datos que ya se halla guardado de este al momento de compras pasadas.
+            'Vendedor', --Es el que vende los productos en cualquiera de nuestros puntos de venta fisico
+            'Analista_Datos', -- Puede ver mucha informacion confidencial ya que se encarga de analizar absolutamente todo 
+            -- de como le esta yendo a nuestra empresa
+            'Encargado_Inventario', --Es el encargado de recibir todos los productos de los distintos proveedor que agregar su informacion, 
+            -- stock, ubicacion, etc.
+            'Gestor_Productos', --Es el encargado de solicitar los productos que se estan necesitando comprando, ya que muchos clientes lo solicitan 
+            -- o hay poco stock de estos
+            'Administrador' --controla todo a nivel administrativo, puede crear cuentas de todos los empleados, ver informacion confidencial
         )
     ),
     Fecha_Creacion DATETIME DEFAULT GETDATE() NOT NULL,
     Num_Cuenta_Bancaria VARCHAR(30) NULL DEFAULT NULL, 
     Tipo_Cuenta_Bancaria VARCHAR(20) NULL CHECK(Tipo_Cuenta_Bancaria IN ('Ahorro', 'Corriente')),
     Activo BIT DEFAULT 1,
-    Contribuyente_Especial BIT DEFAULT 0,
-    Obligado_Contabilidad BIT DEFAULT 0,
-    FK_Ubicacion INT REFERENCES Ubicaciones_Geograficas(Id)
+    Contribuyente_Especial BIT DEFAULT 0 NOT NULL,
+    Obligado_Contabilidad BIT DEFAULT 0 NOT NULL,
+    Creado_Por INT REFERENCES Usuarios(Id)
 );
 GO
 
@@ -514,20 +512,6 @@ CREATE TABLE Productos_Populares_Cache (
 -- INSERTAR DATOS COMPLETOS (CORREGIDO)
 -- ============================================
 
--- 1. Ubicaciones_Geograficas
-INSERT INTO Ubicaciones_Geograficas (Codigo, Nombre, Tipo, FK_Padre, Codigo_Postal, Zona_Horaria)
-VALUES 
-('EC', 'Ecuador', 'Pais', NULL, NULL, 'America/Guayaquil'),
-('EC-P', 'Pichincha', 'Provincia', 1, NULL, NULL),
-('EC-G', 'Guayas', 'Provincia', 1, NULL, NULL),
-('EC-A', 'Azuay', 'Provincia', 1, NULL, NULL),
-('EC-UIO', 'Quito', 'Ciudad', 2, '170135', 'America/Guayaquil'),
-('EC-GYE', 'Guayaquil', 'Ciudad', 3, '090150', 'America/Guayaquil'),
-('EC-CUE', 'Cuenca', 'Ciudad', 4, '010150', 'America/Guayaquil'),
-('EC-UIO-N', 'Norte', 'Parroquia', 5, '170135', NULL),
-('EC-UIO-S', 'Sur', 'Parroquia', 5, '170136', NULL);
-GO
-
 -- 2. Categorias
 INSERT INTO Categorias (Nombre, Descripcion, Activo, FK_Categoria_Padre, Fecha_Creacion)
 VALUES 
@@ -609,26 +593,118 @@ VALUES
 GO
 
 -- 9. Usuarios (CORREGIDO: Tipo_Identificacion solo puede ser 'Cedula' o 'Pasaporte')
-INSERT INTO Usuarios (Nombres, Apellidos, Razon_Social, Tipo_Identificacion, Identificacion, RUC, Correo, Contrasena, Celular, Convencional, Direccion, Ciudad, Rol, Fecha_Creacion, Num_Cuenta_Bancaria, Tipo_Cuenta_Bancaria, Activo, Contribuyente_Especial, Obligado_Contabilidad, FK_Ubicacion)
-VALUES 
-('Juan', 'Pérez', NULL, 'Cedula', '0912345678', '0912345678001', 'juan.perez@gmail.com', HASHBYTES('SHA2_256', 'Juan123*'), '0987654321', '042345678', 'Av. Amazonas N12-34', 'Quito', 'Cliente', '2023-01-15 09:30:00', '0102030405060708', 'Ahorro', 1, 0, 0, 5),
-('Ana', 'Rodríguez', NULL, 'Cedula', '0923456789', '0923456789001', 'ana.rodriguez@empresa.com', HASHBYTES('SHA2_256', 'Ana123*'), '0998765432', '042111222', 'Av. 9 de Octubre 123', 'Guayaquil', 'Cliente', '2023-02-20 10:15:00', '2222333344445555', 'Ahorro', 1, 0, 0, 6),
-('María', 'Gómez', NULL, 'Cedula', '0934567890', '0934567890001', 'maria.gomez@empresa.com', HASHBYTES('SHA2_256', 'Maria456*'), '0991234567', NULL, 'Av. Shyris N45-67', 'Quito', 'Revisor', '2023-03-10 14:20:00', '1718192021222324', 'Corriente', 1, 0, 1, 5),
-('Pedro', 'López', NULL, 'Cedula', '0945678901', '0945678901001', 'pedro.lopez@empresa.com', HASHBYTES('SHA2_256', 'Pedro456*'), '0988887777', NULL, 'Av. 6 de Diciembre N23-45', 'Quito', 'Revisor', '2023-04-05 11:45:00', '3333444455556666', 'Corriente', 1, 0, 1, 5),
-('Carlos', 'Ramírez', NULL, 'Cedula', '0956789012', '0956789012001', 'carlos.ramirez@soporte.com', HASHBYTES('SHA2_256', 'Carlos789*'), '0976543210', '042998877', 'Av. de la Prensa N56-78', 'Quito', 'Tecnico', '2023-05-12 08:30:00', '2526272829303132', 'Ahorro', 1, 0, 0, 5),
-('Ana', 'Torres', NULL, 'Cedula', '0967890123', '0967890123001', 'ana.torres@soporte.com', HASHBYTES('SHA2_256', 'Ana123*'), '0988888888', '042123456', 'Calle 10 de Agosto N34-56', 'Guayaquil', 'Tecnico', '2023-06-18 13:15:00', '4142434445464748', 'Corriente', 1, 0, 0, 6),
-('Luis', 'Fernández', NULL, 'Cedula', '0978901234', '0978901234001', 'luis.fernandez@soporte.com', HASHBYTES('SHA2_256', 'Luis123*'), '0977777777', NULL, 'Av. del Bombero N67-89', 'Quito', 'Tecnico', '2023-07-22 16:40:00', '5758596061626364', 'Ahorro', 1, 0, 0, 5),
-('Roberto', 'Mendoza', NULL, 'Cedula', '0989012345', '0989012345001', 'roberto.mendoza@logistica.com', HASHBYTES('SHA2_256', 'Roberto123*'), '0961122334', NULL, 'Calle 5 de Junio N12-34', 'Guayaquil', 'Personal de Entrega', '2023-08-30 09:10:00', '3334353637383940', 'Corriente', 1, 0, 0, 6),
-('Sofía', 'Castro', NULL, 'Cedula', '0990123456', '0990123456001', 'sofia.castro@logistica.com', HASHBYTES('SHA2_256', 'Sofia123*'), '0969988776', NULL, 'Av. Francisco de Orellana', 'Guayaquil', 'Personal de Entrega', '2023-09-14 12:25:00', '7071727374757677', 'Ahorro', 1, 0, 0, 6),
-('Empresa', 'XYZ S.A.', 'EMPRESA XYZ SOCIEDAD ANONIMA', 'Cedula', '0911111111001', '0911111111001', 'contacto@xyz.com', HASHBYTES('SHA2_256', 'Xyz123*'), '0999999999', '022333444', 'Av. Amazonas y Patria', 'Quito', 'Cliente_Juridico', '2023-10-05 15:30:00', '8888999900001111', 'Corriente', 1, 1, 1, 5),
-('Miguel', 'Álvarez', NULL, 'Cedula', '0991122334', '0991122334001', 'miguel.alvarez@techstore.ec', HASHBYTES('SHA2_256', 'Miguel123*'), '0981122334', '022444555', 'Av. Amazonas N100-200', 'Quito', 'Vendedor', '2023-11-10 08:15:00', '1122334455667788', 'Corriente', 1, 0, 0, 5),
-('Laura', 'Morales', NULL, 'Cedula', '0992233445', '0992233445001', 'laura.morales@techstore.ec', HASHBYTES('SHA2_256', 'Laura123*'), '0992233445', NULL, 'Calle Foch N45-67', 'Quito', 'Analista_Datos', '2023-11-15 10:30:00', '2233445566778899', 'Ahorro', 1, 0, 0, 5),
-('Diego', 'Vargas', NULL, 'Cedula', '0993344556', '0993344556001', 'diego.vargas@techstore.ec', HASHBYTES('SHA2_256', 'Diego123*'), '0973344556', '022555666', 'Av. 6 de Diciembre N300', 'Quito', 'Encargado_Inventario', '2023-11-20 14:45:00', '3344556677889900', 'Corriente', 1, 0, 0, 5),
-('Gabriela', 'Rojas', NULL, 'Cedula', '0994455667', '0994455667001', 'gabriela.rojas@techstore.ec', HASHBYTES('SHA2_256', 'Gabriela123*'), '0984455667', NULL, 'Av. Naciones Unidas', 'Quito', 'Atencion_Cliente', '2023-11-25 09:20:00', '4455667788990011', 'Ahorro', 1, 0, 0, 5),
-('Andrés', 'Silva', NULL, 'Cedula', '0995566778', '0995566778001', 'andres.silva@techstore.ec', HASHBYTES('SHA2_256', 'Andres123*'), '0995566778', '022777888', 'Av. González Suárez', 'Quito', 'Gestor_Productos', '2023-12-01 11:10:00', '5566778899001122', 'Corriente', 1, 0, 0, 5),
-('Administrador', 'Sistema', NULL, 'Cedula', '0996677889', '0996677889001', 'admin@techstore.ec', HASHBYTES('SHA2_256', 'Admin123*'), '0996677889', '022888999', 'Av. Amazonas N12-34', 'Quito', 'Administrador', '2023-01-01 00:00:00', '6677889900112233', 'Corriente', 1, 0, 1, 5);
-GO
+INSERT INTO Usuarios (
+    Nombres, Apellidos, Razon_Social, Tipo_Identificacion, Identificacion, 
+    RUC, Correo, Contrasena, Celular, Convencional, Pais, Division_administrativa, 
+    Ciudad, Codigo_Postal, Direccion, Rol, Fecha_Creacion, Num_Cuenta_Bancaria, 
+    Tipo_Cuenta_Bancaria, Activo, Contribuyente_Especial, Obligado_Contabilidad, Creado_Por
+) VALUES 
+-- Cliente Persona Natural
+('Juan', 'Pérez', 'Individuo', 'Cedula', '0912345678', '0912345678001', 
+ 'juan.perez@gmail.com', HASHBYTES('SHA2_256', 'Juan123*'), '0987654321', 
+ '042345678', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. Amazonas N12-34 y Patria', 'Cliente', '2023-01-15 09:30:00', 
+ '0102030405060708', 'Ahorro', 1, 0, 0, NULL),
 
+('Ana', 'Rodríguez', 'Individuo', 'Cedula', '0923456789', '0923456789001', 
+ 'ana.rodriguez@empresa.com', HASHBYTES('SHA2_256', 'Ana123*'), '0998765432', 
+ '042111222', 'Ecuador', 'Guayas', 'Guayaquil', '090150', 
+ 'Av. 9 de Octubre 123 y Pedro Carbo', 'Cliente', '2023-02-20 10:15:00', 
+ '2222333344445555', 'Ahorro', 1, 0, 0, NULL),
+
+-- Revisores
+('María', 'Gómez', 'Individuo', 'Cedula', '0934567890', '0934567890001', 
+ 'maria.gomez@empresa.com', HASHBYTES('SHA2_256', 'Maria456*'), '0991234567', 
+ '042333444', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. Shyris N45-67 y Naciones Unidas', 'Revisor', '2023-03-10 14:20:00', 
+ '1718192021222324', 'Corriente', 1, 0, 1, NULL),
+
+('Pedro', 'López', 'Individuo', 'Cedula', '0945678901', '0945678901001', 
+ 'pedro.lopez@empresa.com', HASHBYTES('SHA2_256', 'Pedro456*'), '0988887777', 
+ '042555666', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. 6 de Diciembre N23-45 y Colón', 'Revisor', '2023-04-05 11:45:00', 
+ '3333444455556666', 'Corriente', 1, 0, 1, NULL),
+
+-- Técnicos
+('Carlos', 'Ramírez', 'Individuo', 'Cedula', '0956789012', '0956789012001', 
+ 'carlos.ramirez@soporte.com', HASHBYTES('SHA2_256', 'Carlos789*'), '0976543210', 
+ '042998877', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. de la Prensa N56-78 y 10 de Agosto', 'Tecnico', '2023-05-12 08:30:00', 
+ '2526272829303132', 'Ahorro', 1, 0, 0, NULL),
+
+('Ana', 'Torres', 'Individuo', 'Cedula', '0967890123', '0967890123001', 
+ 'ana.torres@soporte.com', HASHBYTES('SHA2_256', 'Ana123*'), '0988888888', 
+ '042123456', 'Ecuador', 'Guayas', 'Guayaquil', '090150', 
+ 'Calle 10 de Agosto N34-56 y Boyacá', 'Tecnico', '2023-06-18 13:15:00', 
+ '4142434445464748', 'Corriente', 1, 0, 0, NULL),
+
+('Luis', 'Fernández', 'Individuo', 'Cedula', '0978901234', '0978901234001', 
+ 'luis.fernandez@soporte.com', HASHBYTES('SHA2_256', 'Luis123*'), '0977777777', 
+ '042777888', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. del Bombero N67-89 y Mariscal Sucre', 'Tecnico', '2023-07-22 16:40:00', 
+ '5758596061626364', 'Ahorro', 1, 0, 0, NULL),
+
+-- Personal de Entrega
+('Roberto', 'Mendoza', 'Individuo', 'Cedula', '0989012345', '0989012345001', 
+ 'roberto.mendoza@logistica.com', HASHBYTES('SHA2_256', 'Roberto123*'), '0961122334', 
+ '042999000', 'Ecuador', 'Guayas', 'Guayaquil', '090150', 
+ 'Calle 5 de Junio N12-34 y Esmeraldas', 'Personal de Entrega', '2023-08-30 09:10:00', 
+ '3334353637383940', 'Corriente', 1, 0, 0, NULL),
+
+('Sofía', 'Castro', 'Individuo', 'Cedula', '0990123456', '0990123456001', 
+ 'sofia.castro@logistica.com', HASHBYTES('SHA2_256', 'Sofia123*'), '0969988776', 
+ '042111000', 'Ecuador', 'Guayas', 'Guayaquil', '090150', 
+ 'Av. Francisco de Orellana y Juan Tanca Marengo', 'Personal de Entrega', '2023-09-14 12:25:00', 
+ '7071727374757677', 'Ahorro', 1, 0, 0, NULL),
+
+-- Cliente Jurídico
+('Empresa', 'XYZ S.A.', 'EMPRESA XYZ SOCIEDAD ANONIMA', 'Cedula', '0911111111001', '0911111111001', 
+ 'contacto@xyz.com', HASHBYTES('SHA2_256', 'Xyz123*'), '0999999999', 
+ '022333444', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. Amazonas y Patria, Edificio Corporativo', 'Cliente_Juridico', '2023-10-05 15:30:00', 
+ '8888999900001111', 'Corriente', 1, 1, 1, NULL),
+
+-- Vendedor
+('Miguel', 'Álvarez', 'Individuo', 'Cedula', '0991122334', '0991122334001', 
+ 'miguel.alvarez@techstore.ec', HASHBYTES('SHA2_256', 'Miguel123*'), '0981122334', 
+ '022444555', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. Amazonas N100-200 y República', 'Vendedor', '2023-11-10 08:15:00', 
+ '1122334455667788', 'Corriente', 1, 0, 0, NULL),
+
+-- Analista de Datos
+('Laura', 'Morales', 'Individuo', 'Cedula', '0992233445', '0992233445001', 
+ 'laura.morales@techstore.ec', HASHBYTES('SHA2_256', 'Laura123*'), '0992233445', 
+ '022666777', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Calle Foch N45-67 y 6 de Diciembre', 'Analista_Datos', '2023-11-15 10:30:00', 
+ '2233445566778899', 'Ahorro', 1, 0, 0, NULL),
+
+-- Encargados de Inventario
+('Diego', 'Vargas', 'Individuo', 'Cedula', '0993344556', '0993344556001', 
+ 'diego.vargas@techstore.ec', HASHBYTES('SHA2_256', 'Diego123*'), '0973344556', 
+ '022555666', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. 6 de Diciembre N300 y Granados', 'Encargado_Inventario', '2023-11-20 14:45:00', 
+ '3344556677889900', 'Corriente', 1, 0, 0, NULL),
+
+('Gabriela', 'Rojas', 'Individuo', 'Cedula', '0994455667', '0994455667001', 
+ 'gabriela.rojas@techstore.ec', HASHBYTES('SHA2_256', 'Gabriela123*'), '0984455667', 
+ '022888999', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. Naciones Unidas y Amazonas', 'Encargado_Inventario', '2023-11-25 09:20:00', 
+ '4455667788990011', 'Ahorro', 1, 0, 0, NULL),
+
+-- Gestor de Productos
+('Andrés', 'Silva', 'Individuo', 'Cedula', '0995566778', '0995566778001', 
+ 'andres.silva@techstore.ec', HASHBYTES('SHA2_256', 'Andres123*'), '0995566778', 
+ '022777888', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. González Suárez y Orellana', 'Gestor_Productos', '2023-12-01 11:10:00', 
+ '5566778899001122', 'Corriente', 1, 0, 0, NULL),
+
+-- Administrador
+('Administrador', 'Sistema', 'Individuo', 'Cedula', '0996677889', '0996677889001', 
+ 'admin@techstore.ec', HASHBYTES('SHA2_256', 'Admin123*'), '0996677889', 
+ '022888999', 'Ecuador', 'Pichincha', 'Quito', '170135', 
+ 'Av. Amazonas N12-34 y Patria, Piso 10', 'Administrador', '2023-01-01 00:00:00', 
+ '6677889900112233', 'Corriente', 1, 0, 1, NULL);
+GO
 -- 10. Inventario_Ubicaciones
 INSERT INTO Inventario_Ubicaciones (Codigo, Nombre, Tipo, FK_Ubicacion_Padre, Capacidad_Maxima, Activo)
 VALUES 

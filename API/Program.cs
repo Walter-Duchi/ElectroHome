@@ -10,7 +10,6 @@ using System.Text;
 using QuestPDF.Infrastructure;
 
 using Microsoft.Extensions.FileProviders;
-using Application.DTOs.Reclamos.Auth;
 using Application.DTOs.Reclamos.Entrega;
 using Application.DTOs.Reclamos.Tecnico;
 using Application.DTOs.Reclamos.Reclamo;
@@ -18,6 +17,7 @@ using Application.DTOs.Reclamos.Cliente;
 using Application.DTOs.Reclamos.User;
 using Infrastructure.Reclamos.Services;
 using Infrastructure.Reclamos.Interfaces;
+using Application.DTOs.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -27,9 +27,15 @@ public partial class Usuario
 
     public string? Convencional { get; set; }
 
-    public string? Direccion { get; set; }
+    public string? Pais { get; set; }
+
+    public string? DivisionAdministrativa { get; set; }
 
     public string? Ciudad { get; set; }
+
+    public string? CodigoPostal { get; set; }
+
+    public string? Direccion { get; set; }
 
     public string Rol { get; set; } = null!;
 
@@ -41,11 +47,11 @@ public partial class Usuario
 
     public bool? Activo { get; set; }
 
-    public bool? ContribuyenteEspecial { get; set; }
+    public bool ContribuyenteEspecial { get; set; }
 
-    public bool? ObligadoContabilidad { get; set; }
+    public bool ObligadoContabilidad { get; set; }
 
-    public int? FkUbicacion { get; set; }
+    public int? CreadoPor { get; set; }
 
     public virtual ICollection<CarritoCompra> CarritoCompras { get; set; } = new List<CarritoCompra>();
 
@@ -53,13 +59,15 @@ public partial class Usuario
 
     public virtual ICollection<ConfiguracionGeneral> ConfiguracionGenerals { get; set; } = new List<ConfiguracionGeneral>();
 
-    public virtual UbicacionesGeografica? FkUbicacionNavigation { get; set; }
+    public virtual Usuario? CreadoPorNavigation { get; set; }
 
     public virtual ICollection<ImpuestosConfiguracion> ImpuestosConfiguracionCreadoPorNavigations { get; set; } = new List<ImpuestosConfiguracion>();
 
     public virtual ICollection<ImpuestosConfiguracion> ImpuestosConfiguracionModificadoPorNavigations { get; set; } = new List<ImpuestosConfiguracion>();
 
     public virtual ICollection<InventarioMovimiento> InventarioMovimientos { get; set; } = new List<InventarioMovimiento>();
+
+    public virtual ICollection<Usuario> InverseCreadoPorNavigation { get; set; } = new List<Usuario>();
 
     public virtual ICollection<Producto> ProductoCreadoPorNavigations { get; set; } = new List<Producto>();
 
