@@ -11,6 +11,7 @@ import TecnicoDashboard from '../components/Tecnico/TecnicoDashboard';
 import RevisarProducto from '../components/Tecnico/RevisarProducto';
 import EntregaDashboard from '../components/Entrega/EntregaDashboard';
 import ClienteDashboard from '../components/Cliente/ClienteDashboard';
+import DatosEmpresaConfig from '../components/Admin/DatosEmpresaConfig';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -44,6 +45,8 @@ const RoleBasedHome: React.FC = () => {
       return <TecnicoDashboard />;
     case 'Personal de Entrega':
       return <EntregaDashboard />;
+    case 'Administrador': // NUEVO: Para administrador se muestra la configuración de la empresa
+      return <DatosEmpresaConfig />;
     default:
       // Si no hay rol definido, mostrar una pantalla de error o redirigir
       return (

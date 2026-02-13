@@ -13,6 +13,7 @@
     <Folder Include="components\Layout\" />
     <Folder Include="components\Entrega\" />
     <Folder Include="components\Cliente\" />
+    <Folder Include="components\Admin\" />
     <Folder Include="components\ThemeSelector\" />
     <Folder Include="components\Reclamo\" />
   </ItemGroup>

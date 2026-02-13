@@ -8,16 +8,15 @@ using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
 using QuestPDF.Infrastructure;
-
-using Microsoft.Extensions.FileProviders;
+using Application.DTOs.Admin;
 using Application.DTOs.Reclamos.Entrega;
 using Application.DTOs.Reclamos.Tecnico;
 using Application.DTOs.Reclamos.Reclamo;
-using Application.DTOs.Reclamos.Cliente;
 using Application.DTOs.Reclamos.User;
 using Infrastructure.Reclamos.Services;
 using Infrastructure.Reclamos.Interfaces;
 using Application.DTOs.Auth;
+using Application.DTOs.Reclamos.Cliente;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +95,7 @@ builder.Services.AddScoped<IReclamoService, ReclamoService>();
 builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 builder.Services.AddScoped<IEntregaService, EntregaService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
+builder.Services.AddScoped<IDatosEmpresaService, DatosEmpresaService>();
 
 builder.Services.AddCors(options =>
 {
@@ -987,61 +987,45 @@ app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Client
     }
 });
 
-app.Run();
+// ============================================
+// ENDPOINTS PARA ADMIN - DATOS EMPRESA
+// ============================================
 
-/*
-app.MapPost("/api/users/create", [Authorize] async (CreateUserRequest request, IUserService userService, HttpContext httpContext) =>
+// Obtener datos de la empresa
+app.MapGet("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] async (IDatosEmpresaService datosEmpresaService, ILogger<Program> logger) =>
 {
     try
     {
-        var userRole = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (string.IsNullOrEmpty(userRole))
-            return Results.Unauthorized();
-
-        var creadoPorId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        var response = await userService.CreateUserAsync(request, creadoPorId);
-        return Results.Ok(response);
+        logger.LogInformation("Obteniendo datos de la empresa...");
+        var datos = await datosEmpresaService.ObtenerDatosEmpresaAsync();
+        return datos != null ? Results.Ok(datos) : Results.NotFound(new { message = "No se han configurado los datos de la empresa." });
     }
-    catch (UnauthorizedAccessException ex)
+    catch (Exception ex)
     {
-        return Results.Forbid();
+        logger.LogError(ex, "Error al obtener datos de la empresa.");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
+// Actualizar datos de la empresa
+app.MapPut("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] async (UpdateDatosEmpresaRequest request, IDatosEmpresaService datosEmpresaService, ILogger<Program> logger) =>
+{
+    try
+    {
+        logger.LogInformation("Actualizando datos de la empresa...");
+        var resultado = await datosEmpresaService.ActualizarDatosEmpresaAsync(request);
+        return Results.Ok(resultado);
     }
     catch (ArgumentException ex)
     {
+        logger.LogWarning(ex, "Error de validación al actualizar datos de la empresa.");
         return Results.BadRequest(new { message = ex.Message });
     }
     catch (Exception ex)
     {
-        return Results.Problem($"Error interno del servidor: {ex.Message}");
+        logger.LogError(ex, "Error al actualizar datos de la empresa.");
+        return Results.Problem($"Error interno: {ex.Message}");
     }
 });
 
-app.MapGet("/api/users/allowed-roles", [Authorize] (IUserService userService, HttpContext httpContext) =>
-{
-    var userRole = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
-
-    if (string.IsNullOrEmpty(userRole))
-        return Results.Unauthorized();
-
-    var allowedRoles = new List<string>();
-
-    switch (userRole)
-    {
-        case "Revisor":
-            allowedRoles = new List<string> { "Cliente", "Revisor" };
-            break;
-        case "Tecnico":
-            allowedRoles = new List<string> { "Tecnico" };
-            break;
-        case "Personal de Entrega":
-            allowedRoles = new List<string> { "Personal de Entrega" };
-            break;
-        default:
-            allowedRoles = new List<string>();
-            break;
-    }
-
-    return Results.Ok(allowedRoles);
-});
-*/
+app.Run();
