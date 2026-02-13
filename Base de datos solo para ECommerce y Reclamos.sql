@@ -120,8 +120,6 @@ CREATE TABLE Configuracion_Empresa(
     Nombre_Comercial VARCHAR(300) NOT NULL,
     Razon_Social VARCHAR(300) NOT NULL,
     Direccion_Matriz VARCHAR(500) NOT NULL,
-    Secuencial_Factura INT NOT NULL DEFAULT 1,
-    Secuencial_Nota_Credito INT NOT NULL DEFAULT 1
 );
 
 -- ============================================
@@ -438,17 +436,13 @@ INSERT INTO Configuracion_Empresa (
     RUC_Empresa,
     Nombre_Comercial,
     Razon_Social,
-    Direccion_Matriz,
-    Secuencial_Factura,
-    Secuencial_Nota_Credito
+    Direccion_Matriz
 )
 VALUES (
     '0999999999001',
     'Electro Home',
     'Electro Home GuayaquilS.A.',
-    'Av. Principal 123, Guayaquil, Ecuador',
-    1,
-    1
+    'Av. Principal 123, Guayaquil, Ecuador'
 );
 
 -- 8. Marcas
