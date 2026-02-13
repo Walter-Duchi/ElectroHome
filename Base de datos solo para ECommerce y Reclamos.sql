@@ -433,7 +433,7 @@ VALUES (
 );
 GO
 
-INSERT INTO Configuracion_Empresa (
+INSERT INTO Datos_Empresa (
     RUC_Empresa,
     Nombre_Comercial,
     Razon_Social,
