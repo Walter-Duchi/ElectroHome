@@ -11,7 +11,7 @@ public partial class NumeroSerieProducto
 
     public string NumeroSerie { get; set; } = null!;
 
-    public string? EstadoInventario { get; set; }
+    public string EstadoInventario { get; set; } = null!;
 
     public DateTime? FechaIngreso { get; set; }
 

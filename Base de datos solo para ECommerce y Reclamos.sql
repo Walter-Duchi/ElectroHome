@@ -79,14 +79,6 @@ CREATE TABLE Categorias(
 );
 GO
 
- CREATE TABLE Impuesto_Arancelario(
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    Pais VARCHAR(100) NOT NULL,
-    Porcentaje DECIMAL(5,2) NOT NULL
- );
-
- GO
-
  CREATE TABLE Proveedores(
     Id INT IDENTITY(1,1) PRIMARY KEY,
     Nombre VARCHAR(100) NOT NULL,
@@ -105,7 +97,7 @@ GO
 CREATE TABLE Metodos_Pago(
     Id INT IDENTITY(1,1) PRIMARY KEY,
     Tipo VARCHAR(20) UNIQUE NOT NULL CHECK (
-        Tipo IN ('Efectivo', 'Debito', 'Cedrito', 'Payphone', 'Transferencia')
+        Tipo IN ('Efectivo', 'Debito', 'Credito', 'Payphone', 'Transferencia')
     ),    
     Descripcion VARCHAR(200),
     Activo BIT DEFAULT 1,
@@ -114,38 +106,23 @@ CREATE TABLE Metodos_Pago(
 );
 GO
 
-
-
-
 -- Tabla Configuración SRI
 CREATE TABLE Configuracion_SRI(
     Id INT IDENTITY(1,1) PRIMARY KEY,
     Ambiente VARCHAR(20) DEFAULT 'Pruebas' CHECK (Ambiente IN ('Pruebas', 'Produccion')),
-    Establecimiento VARCHAR(3) NOT NULL,
-    Punto_Emision VARCHAR(3) NOT NULL,
-    Secuencial_Factura INT NOT NULL DEFAULT 1,
-    Secuencial_Nota_Credito INT NOT NULL DEFAULT 1,
-    RUC_Empresa VARCHAR(13) NOT NULL,
-    Nombre_Comercial VARCHAR(300) NOT NULL,
-    Razon_Social VARCHAR(300) NOT NULL,
-    Direccion_Matriz VARCHAR(500) NOT NULL,
-    Obligado_Contabilidad BIT DEFAULT 1,
     Token_Acceso VARCHAR(500),
     Fecha_Expiracion_Token DATETIME
 );
 
--- Tabla Configuración General
-CREATE TABLE Configuracion_General(
+CREATE TABLE Configuracion_Empresa(
     Id INT IDENTITY(1,1) PRIMARY KEY,
-    Clave VARCHAR(100) UNIQUE NOT NULL,
-    Valor VARCHAR(1000) NOT NULL,
-    Tipo VARCHAR(20) CHECK (Tipo IN ('Texto', 'Numero', 'Booleano', 'Json')),
-    Categoria VARCHAR(50),
-    Descripcion VARCHAR(500),
-    Fecha_Modificacion DATETIME DEFAULT GETDATE(),
-    Modificado_Por INT REFERENCES Usuarios(Id)
+    RUC_Empresa VARCHAR(13) NOT NULL,
+    Nombre_Comercial VARCHAR(300) NOT NULL,
+    Razon_Social VARCHAR(300) NOT NULL,
+    Direccion_Matriz VARCHAR(500) NOT NULL,
+    Secuencial_Factura INT NOT NULL DEFAULT 1,
+    Secuencial_Nota_Credito INT NOT NULL DEFAULT 1
 );
-GO
 
 -- ============================================
 -- TABLAS RECLAMOS
@@ -202,7 +179,6 @@ CREATE TABLE Productos(
     Activo BIT DEFAULT 1,
     Imagen_URL VARCHAR(500),
     Fecha_Creacion DATETIME DEFAULT GETDATE(),
-    FK_Impuesto_Arancelario INT REFERENCES Impuesto_Arancelario(Id) NOT NULL,
     --Normalmente los productos van a tener garantia de 3 dias si es extremamente barato y generico, con costos de poquisimos dolares.
 	--pero si tiene 0 es porque ese producto esta descontinuado por la marca y no se ofrece garantia alguna
     Dias_Garantia INT NOT NULL CHECK (Dias_Garantia >= 0),
@@ -218,7 +194,7 @@ CREATE TABLE Inventario_Movimientos(
     Id INT IDENTITY(1,1) PRIMARY KEY,
     FK_Producto INT REFERENCES Productos(Id) NOT NULL,
     FK_Usuario INT REFERENCES Usuarios(Id),
-    Tipo_Movimiento VARCHAR(20) CHECK (Tipo_Movimiento IN ('Entrada', 'Salida', 'Ajuste', 'Devolucion')),
+    Tipo_Movimiento VARCHAR(20) NOT NULL CHECK (Tipo_Movimiento IN ('Entrada', 'Salida', 'Ajuste', 'Devolucion')),
     Cantidad INT NOT NULL,
     Cantidad_Anterior INT NOT NULL,
     Cantidad_Nueva INT NOT NULL,
@@ -243,7 +219,7 @@ CREATE TABLE Numero_Serie_Productos(
     Id INT IDENTITY(1,1) PRIMARY KEY,
     FK_Producto INT REFERENCES Productos(Id) NOT NULL,
     Numero_Serie VARCHAR(50) UNIQUE NOT NULL,
-    Estado_Inventario VARCHAR(50) CHECK (Estado_Inventario IN 
+    Estado_Inventario VARCHAR(50) NOT NULL CHECK (Estado_Inventario IN 
     ('Se_Puede_Vender', 'Vendido', 'Entregado_Como_Reemplazo_Al_Cliente', 'Recibido_Del_Cliente_Por_Defecto_De_Fabrica')),
     -- Si se puede vender entonces puedes venderlo
 	-- Si esta vendido, Entregado_Como_Reemplazo_Al_Cliente o Recibido_Del_Cliente_Por_Defecto_De_Fabrica no se lo puede vender
@@ -277,11 +253,10 @@ CREATE TABLE Ventas(
     Observaciones VARCHAR(1000),
     Direccion_Entrega VARCHAR(500),
     Telefono_Contacto VARCHAR(15),
-    Total_Compra DECIMAL(12,2) NOT NULL CHECK (Total_Compra >= 0),
+    Total_Compra DECIMAL(12,2) NOT NULL CHECK (Total_Compra > 0),
     Creado_Por INT REFERENCES Usuarios(Id),
     Fecha_Modificacion DATETIME,
     Modificado_Por INT REFERENCES Usuarios(Id)
-
 );
 GO
 
@@ -325,7 +300,7 @@ CREATE TABLE Reclamos_Producto_SN(
     FK_Numero_Serie_Productos INT REFERENCES Numero_Serie_Productos(Id) NOT NULL UNIQUE,
     FK_Reclamos INT REFERENCES Reclamos(Id) NOT NULL,
     Fecha_Venta_Cliente_Final DATETIME NOT NULL,
-    Fecha_Reclamo_Cliente_Final DATETIME DEFAULT NULL,
+    Fecha_Reclamo_Cliente_Final DATETIME,
     Forma_Compensacion VARCHAR(20) CHECK (Forma_Compensacion IN ('Reembolso', 'Reemplazo')) NOT NULL,
     --Pendiente cuando inicia el proceso, en revision cuando se asigna de Tecnico, 
 	--Aprobado o Reprobado cuando el Tecnico da su respuesta
@@ -388,36 +363,12 @@ CREATE TABLE Comprobante_Producto_Reemplazado(
 );
 GO
 
---adicionales recomendadas
--- 1. Tabla para historial de precios (para auditoría)
-CREATE TABLE Producto_Precio_Historial (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    FK_Producto INT REFERENCES Productos(Id) NOT NULL,
-    Precio_Anterior DECIMAL(12,2) NOT NULL,
-    Precio_Nuevo DECIMAL(12,2) NOT NULL,
-    FK_Usuario INT REFERENCES Usuarios(Id),
-    Fecha_Cambio DATETIME DEFAULT GETDATE(),
-    Motivo VARCHAR(200)
-);
-
 -- 2. Tabla para imágenes adicionales de productos
 CREATE TABLE Producto_Imagenes (
     Id INT IDENTITY(1,1) PRIMARY KEY,
     FK_Producto INT REFERENCES Productos(Id) NOT NULL,
     URL_Imagen VARCHAR(500) NOT NULL,
     Es_Principal BIT DEFAULT 0
-);
-
--- 3. Tabla para promociones/descuentos
-CREATE TABLE Promociones (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    Codigo VARCHAR(50) UNIQUE NOT NULL,
-    Descripcion VARCHAR(500),
-    Tipo VARCHAR(20) CHECK (Tipo IN ('Porcentaje', 'Monto_Fijo', 'Envio_Gratis')),
-    Valor DECIMAL(10,2),
-    Fecha_Inicio DATETIME NOT NULL,
-    Fecha_Fin DATETIME NOT NULL,
-    Activo BIT DEFAULT 1
 );
 
 -- Carrito de compras (si es e-commerce online)
@@ -428,83 +379,6 @@ CREATE TABLE Carrito_Compras (
     Cantidad INT NOT NULL DEFAULT 1,
     Fecha_Agregado DATETIME DEFAULT GETDATE(),
     UNIQUE(FK_Cliente, FK_Producto)
-);
-
--- Reseñas de productos
-CREATE TABLE Resenas_Productos (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    FK_Cliente INT REFERENCES Usuarios(Id) NOT NULL,
-    FK_Producto INT REFERENCES Productos(Id) NOT NULL,
-    Calificacion INT CHECK (Calificacion BETWEEN 1 AND 5),
-    Comentario VARCHAR(2000),
-    Fecha_Resena DATETIME DEFAULT GETDATE(),
-    Estado VARCHAR(20) DEFAULT 'Pendiente' CHECK (Estado IN ('Pendiente', 'Aprobado', 'Rechazado')),
-    UNIQUE(FK_Cliente, FK_Producto)
-);
-
-
-
-CREATE TABLE Envios (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    FK_Venta INT REFERENCES Ventas(Id) NOT NULL,
-    Transportista VARCHAR(100),
-    Guia_Remision VARCHAR(100),
-    Costo_Envio DECIMAL(12,2),
-    Peso_Total DECIMAL(10,2),
-    Dimensiones_Total VARCHAR(50),
-    Estado_Envio VARCHAR(50) CHECK (Estado_Envio IN 
-        ('Pendiente', 'Empacado', 'Enviado', 'En Transito', 'Entregado', 'Devuelto', 'Perdido', 'Cancelado')),
-    Fecha_Despacho DATETIME,
-    Fecha_Estimada_Entrega DATETIME,
-    Fecha_Real_Entrega DATETIME,
-    Firmado_Por VARCHAR(200),
-    Evidencia_Entrega VARCHAR(500)
-);
-
-CREATE TABLE Tarifas_Envio (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    Zona VARCHAR(100) NOT NULL,
-    Peso_Minimo DECIMAL(10,2),
-    Peso_Maximo DECIMAL(10,2),
-    Precio DECIMAL(10,2) NOT NULL,
-    Tiempo_Entrega_Dias INT NOT NULL,
-    Activo BIT DEFAULT 1,
-    FK_Transportista INT, -- Si hay múltiples transportistas
-    Fecha_Actualizacion DATETIME DEFAULT GETDATE()
-);
-
-CREATE TABLE Impuestos_Configuracion (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    Codigo_Impuesto VARCHAR(20) NOT NULL, -- 'IVA', 'ICE', etc.
-    Nombre VARCHAR(100) NOT NULL,
-    Porcentaje DECIMAL(5,2) NOT NULL,
-    Aplicable_A VARCHAR(100), -- 'Todos', 'Electronica', 'Electrodomesticos'
-    Fecha_Vigencia_Inicio DATE NOT NULL,
-    Fecha_Vigencia_Fin DATE,
-    Activo BIT DEFAULT 1,
-    Creado_Por INT REFERENCES Usuarios(Id),
-    Modificado_Por INT REFERENCES Usuarios(Id)
-);
-
-CREATE TABLE Producto_Impuestos (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    FK_Producto INT REFERENCES Productos(Id) NOT NULL,
-    FK_Impuesto INT REFERENCES Impuestos_Configuracion(Id) NOT NULL,
-    Porcentaje_Aplicado DECIMAL(5,2) NOT NULL,
-    Fecha_Vigencia DATE,
-    Activo BIT DEFAULT 1,
-    UNIQUE(FK_Producto, FK_Impuesto)
-);
-
-CREATE TABLE Productos_Populares_Cache (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    FK_Producto INT REFERENCES Productos(Id) UNIQUE NOT NULL,
-    Posicion INT NOT NULL,
-    Ventas_Ultimos_30_Dias INT DEFAULT 0,
-    Vistas_Ultimos_30_Dias INT DEFAULT 0,
-    Ratio_Conversion DECIMAL(5,2),
-    Fecha_Actualizacion DATETIME DEFAULT GETDATE(),
-    INDEX IX_Productos_Populares_Posicion (Posicion)
 );
 
 
@@ -527,17 +401,6 @@ VALUES
 ('Smartwatches', 'Relojes inteligentes', 1, 1, '2023-01-01');
 GO
 
--- 3. Impuesto_Arancelario
-INSERT INTO Impuesto_Arancelario (Pais, Porcentaje)
-VALUES 
-('Ecuador', 0.00),
-('Colombia', 5.00),
-('Perú', 6.00),
-('Chile', 6.00),
-('Estados Unidos', 0.00),
-('China', 15.00);
-GO
-
 -- 4. Proveedores
 INSERT INTO Proveedores (Nombre, Cedula, RUC, Direccion, Telefono, Email, Contacto_Principal, Plazo_Entrega_Dias, Activo, Fecha_Creacion)
 VALUES 
@@ -553,29 +416,40 @@ INSERT INTO Metodos_Pago (Tipo, Descripcion, Activo, Requiere_Confirmacion, Comi
 VALUES 
 ('Efectivo', 'Pago en efectivo en local', 1, 0, 0.00),
 ('Debito', 'Tarjeta de débito', 1, 0, 1.50),
-('Cedrito', 'Crédito interno de la tienda', 1, 1, 0.00),
+('Credito', 'Crédito interno de la tienda', 1, 1, 0.00),
 ('Payphone', 'Pago mediante Payphone', 1, 1, 2.00),
 ('Transferencia', 'Transferencia bancaria', 1, 1, 0.50);
 GO
 
 -- 6. Configuracion_SRI
-INSERT INTO Configuracion_SRI (Ambiente, Establecimiento, Punto_Emision, Secuencial_Factura, Secuencial_Nota_Credito, RUC_Empresa, Nombre_Comercial, Razon_Social, Direccion_Matriz, Obligado_Contabilidad, Token_Acceso, Fecha_Expiracion_Token)
-VALUES 
-('Pruebas', '001', '001', 1000, 1, '0999999999001', 'TechStore Ecuador', 'TECHSTORE ECUADOR S.A.', 'Av. Amazonas N12-34 y Rumiñahui, Quito', 1, 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzZHMiLCJpc3MiOiJtYWdudXMiLCJpYXQiOjE2OTg3NjQwMDAsImV4cCI6MTcyOTk4ODAwMCwiY29kaWdlTWVkaW8iOiIwMDEiLCJhbWJpZW50ZSI6IlBVQkxJQ08ifQ', '2024-12-31 23:59:59');
+INSERT INTO Configuracion_SRI (
+    Ambiente,
+    Token_Acceso,
+    Fecha_Expiracion_Token
+)
+VALUES (
+    'Pruebas',
+    'TOKEN_DE_PRUEBA_ABC123XYZ',
+    DATEADD(DAY, 30, GETDATE())
+);
 GO
 
--- 7. Configuracion_General
-INSERT INTO Configuracion_General (Clave, Valor, Tipo, Categoria, Descripcion, Fecha_Modificacion)
-VALUES 
-('IVA_PORCENTAJE', '12.00', 'Numero', 'Impuestos', 'Porcentaje de IVA aplicable', GETDATE()),
-('TIEMPO_GARANTIA_DEFAULT', '365', 'Numero', 'Productos', 'Días de garantía por defecto', GETDATE()),
-('TIEMPO_RESPUESTA_RECLAMO', '72', 'Numero', 'Reclamos', 'Horas máximas para responder reclamo', GETDATE()),
-('CORREO_CONTACTO', 'soporte@techstore.ec', 'Texto', 'General', 'Correo de contacto principal', GETDATE()),
-('TELEFONO_CONTACTO', '1800-TECHEC', 'Texto', 'General', 'Teléfono de contacto', GETDATE()),
-('PAGINA_WEB', 'www.techstore.ec', 'Texto', 'General', 'URL de la página web', GETDATE()),
-('MONEDA_PRINCIPAL', 'USD', 'Texto', 'Finanzas', 'Moneda principal del sistema', GETDATE()),
-('TIEMPO_EXPIRACION_TOKEN', '24', 'Numero', 'Seguridad', 'Horas de expiración de tokens', GETDATE());
-GO
+INSERT INTO Configuracion_Empresa (
+    RUC_Empresa,
+    Nombre_Comercial,
+    Razon_Social,
+    Direccion_Matriz,
+    Secuencial_Factura,
+    Secuencial_Nota_Credito
+)
+VALUES (
+    '0999999999001',
+    'Electro Home',
+    'Electro Home GuayaquilS.A.',
+    'Av. Principal 123, Guayaquil, Ecuador',
+    1,
+    1
+);
 
 -- 8. Marcas
 INSERT INTO Marcas (Nombre) 
@@ -721,37 +595,71 @@ VALUES
 GO
 
 -- 11. Productos (modificado para usar NULL en Creado_Por y Modificado_Por temporalmente)
-INSERT INTO Productos (SKU, Peso_kg, Alto_cm, Ancho_cm, Profundidad_cm, Visibilidad, Codigo, FK_Marca, FK_Categoria, Modelo, Especificacion, Descripcion, Activo, Imagen_URL, Fecha_Creacion, FK_Impuesto_Arancelario, Dias_Garantia, Precio, Creado_Por, Modificado_Por)
+INSERT INTO Productos (
+SKU, Peso_kg, Alto_cm, Ancho_cm, Profundidad_cm,
+Visibilidad, Codigo, FK_Marca, FK_Categoria,
+Modelo, Especificacion, Descripcion, Activo,
+Imagen_URL, Fecha_Creacion,
+Dias_Garantia, Precio, Creado_Por, Modificado_Por
+)
 VALUES 
-('SM-GS23-256', 0.168, 14.6, 7.0, 0.76, 'Publico', 'PRD001', 1, 2, 'Galaxy S23', 'Smartphone 256GB, 8GB RAM, Snapdragon 8 Gen 2', 'El Galaxy S23 ofrece un rendimiento excepcional con su procesador Snapdragon 8 Gen 2 y cámara de alta resolución.', 1, '/img/products/galaxy_s23.jpg', '2023-01-15', 1, 365, 999.99, 15, 15),
-('SM-GS21-128', 0.169, 14.7, 7.1, 0.78, 'Publico', 'PRD002', 1, 2, 'Galaxy S21', 'Smartphone 128GB, 8GB RAM', 'Galaxy S21 con pantalla Dynamic AMOLED 2X y sistema de cámaras profesional.', 1, '/img/products/galaxy_s21.jpg', '2023-01-15', 1, 365, 699.99, 15, 15),
-('SM-QLED55', 18.5, 71.0, 122.0, 5.5, 'Publico', 'PRD003', 1, 5, 'QLED TV 55"', 'Televisor 4K QLED 55 pulgadas, Smart TV', 'Televisor QLED 4K con tecnología Quantum Dot para colores más vivos y realistas.', 1, '/img/products/qled_tv.jpg', '2023-01-15', 1, 730, 899.99, 15, 15),
-('SM-GTABS9', 0.498, 25.4, 16.5, 0.59, 'Publico', 'PRD004', 1, 3, 'Galaxy Tab S9', 'Tablet 11", 256GB, S-Pen incluido', 'Tablet premium con S-Pen incluido, perfecta para creativos y profesionales.', 1, '/img/products/galaxy_tab.jpg', '2023-01-15', 1, 365, 799.99, 15, 15),
-('SM-GWATCH6', 0.033, 4.4, 4.4, 1.0, 'Publico', 'PRD005', 1, 10, 'Galaxy Watch 6', 'Smartwatch 44mm, LTE, ECG', 'Smartwatch con monitor de ECG, seguimiento de sueño y conectividad LTE.', 1, '/img/products/galaxy_watch.jpg', '2023-01-15', 1, 365, 349.99, 15, 15),
-('SM-GS7-OLD', 0.152, 14.2, 6.9, 0.79, 'Privado', 'PRD006', 1, 2, 'Galaxy S7', 'Smartphone antiguo descontinuado', 'Modelo descontinuado, disponible solo para reposición de garantías.', 0, '/img/products/galaxy_s7.jpg', '2023-01-15', 1, 0, 99.99, 15, 15),
-('LG-OLED65', 25.8, 81.5, 144.0, 4.6, 'Publico', 'PRD007', 2, 5, 'OLED TV 65"', 'Televisor OLED 65 pulgadas, 4K, WebOS', 'Televisor OLED con colores perfectos y sistema operativo webOS.', 1, '/img/products/lg_oled.jpg', '2023-01-15', 1, 730, 1499.99, 15, 15),
-('LG-GRAM17', 1.35, 1.68, 38.0, 26.0, 'Publico', 'PRD008', 2, 4, 'Gram 17"', 'Laptop ultrabook 17", 16GB RAM, 1TB SSD', 'Laptop ultraligera con pantalla de 17 pulgadas y gran capacidad de almacenamiento.', 1, '/img/products/lg_gram.jpg', '2023-01-15', 1, 365, 1699.99, 15, 15),
-('LG-MON27', 5.2, 37.6, 61.2, 21.5, 'Publico', 'PRD009', 2, 1, 'Monitor 27" 4K', 'Monitor IPS 27", 4K UHD, HDR10', 'Monitor 4K UHD con tecnología IPS para ángulos de visión amplios.', 1, '/img/products/lg_monitor.jpg', '2023-01-15', 1, 365, 499.99, 15, 15),
-('AP-IP15P', 0.187, 14.7, 7.1, 0.82, 'Publico', 'PRD010', 3, 2, 'iPhone 15 Pro', 'Smartphone 256GB, Titanio, A17 Pro', 'iPhone 15 Pro con diseño en titanio y el poderoso chip A17 Pro.', 1, '/img/products/iphone15.jpg', '2023-01-15', 1, 365, 1299.99, 15, 15),
-('AP-IP14', 0.174, 14.6, 7.1, 0.78, 'Publico', 'PRD011', 3, 2, 'iPhone 14', 'Smartphone 256GB, A15 Bionic', 'iPhone 14 con chip A15 Bionic y sistema de cámaras avanzado.', 1, '/img/products/iphone14.jpg', '2023-01-15', 1, 365, 999.99, 15, 15),
-('AP-MBAIR', 1.24, 0.41, 30.4, 21.5, 'Publico', 'PRD012', 3, 4, 'MacBook Air M2', 'Laptop 13", 8GB RAM, 256GB SSD', 'MacBook Air con chip M2, diseño delgado y batería de larga duración.', 1, '/img/products/macbook_air.jpg', '2023-01-15', 1, 365, 1099.99, 15, 15),
-('AP-IPAIR5', 0.461, 24.8, 17.8, 0.61, 'Publico', 'PRD013', 3, 3, 'iPad Air 5', 'Tablet 10.9", M1, 64GB', 'iPad Air con chip M1 y compatibilidad con Apple Pencil 2.', 1, '/img/products/ipad_air.jpg', '2023-01-15', 1, 365, 599.99, 15, 15),
-('AP-WATCH9', 0.038, 4.5, 3.8, 1.07, 'Publico', 'PRD014', 3, 10, 'Apple Watch Series 9', 'Smartwatch 45mm, GPS', 'Apple Watch Series 9 con GPS y monitor de salud avanzado.', 1, '/img/products/apple_watch.jpg', '2023-01-15', 1, 365, 429.99, 15, 15),
-('XM-RN13P', 0.185, 16.1, 7.6, 0.81, 'Publico', 'PRD015', 4, 2, 'Redmi Note 13 Pro', 'Smartphone 256GB, 12GB RAM, 200MP cámara', 'Redmi Note 13 Pro con cámara de 200MP y carga rápida de 120W.', 1, '/img/products/redmi_note.jpg', '2023-01-15', 1, 180, 349.99, 15, 15),
-('XM-MITV50', 12.8, 64.5, 111.5, 8.2, 'Publico', 'PRD016', 4, 5, 'Mi TV 4K 50"', 'Televisor 4K Android TV, Dolby Vision', 'Televisor Android TV 4K con soporte Dolby Vision y Atmos.', 1, '/img/products/mi_tv.jpg', '2023-01-15', 1, 365, 449.99, 15, 15),
-('XM-13T', 0.202, 16.2, 7.5, 0.85, 'Publico', 'PRD017', 4, 2, 'Xiaomi 13T', 'Smartphone 256GB, MediaTek Dimensity 8200', 'Xiaomi 13T con pantalla AMOLED y cámara Leica.', 1, '/img/products/xiaomi_13t.jpg', '2023-01-15', 1, 180, 599.99, 15, 15),
-('SN-WHXM5', 0.25, 8.3, 20.4, 24.3, 'Publico', 'PRD018', 5, 6, 'WH-1000XM5', 'Audífonos noise cancelling, 30h batería', 'Audífonos con cancelación de ruido líder en la industria.', 1, '/img/products/sony_headphones.jpg', '2023-01-15', 1, 365, 399.99, 15, 15),
-('SN-PS5', 4.5, 39.0, 26.0, 10.4, 'Publico', 'PRD019', 5, 9, 'PlayStation 5', 'Consola de videojuegos, 1TB SSD', 'Consola PlayStation 5 con SSD ultrarrápido y control DualSense.', 1, '/img/products/ps5.jpg', '2023-01-15', 1, 365, 499.99, 15, 15),
-('SN-BRAVIA55', 18.2, 71.5, 122.5, 4.8, 'Publico', 'PRD020', 5, 5, 'Bravia XR 55"', 'Televisor OLED 55", Cognitive Processor XR', 'Televisor Bravia OLED con procesador cognitivo XR.', 1, '/img/products/bravia.jpg', '2023-01-15', 1, 730, 1799.99, 15, 15),
-('HP-SPECTRE', 1.34, 1.79, 31.9, 22.0, 'Publico', 'PRD021', 6, 4, 'Spectre x360', 'Laptop convertible 14", OLED, i7, 16GB', 'Laptop convertible con pantalla OLED táctil y procesador i7.', 1, '/img/products/spectre.jpg', '2023-01-15', 1, 365, 1299.99, 15, 15),
-('HP-LASERJET', 8.7, 24.3, 39.6, 34.0, 'Publico', 'PRD022', 6, 1, 'LaserJet Pro', 'Impresora láser, WiFi, duplex', 'Impresora láser WiFi con impresión a doble cara automática.', 1, '/img/products/laserjet.jpg', '2023-01-15', 1, 180, 299.99, 15, 15),
-('DL-XPS13', 1.27, 1.54, 29.5, 19.9, 'Publico', 'PRD023', 7, 4, 'XPS 13', 'Laptop 13.4", i7, 16GB, 512GB SSD', 'Laptop XPS 13 con pantalla InfinityEdge y diseño premium.', 1, '/img/products/xps13.jpg', '2023-01-15', 1, 365, 1199.99, 15, 15),
-('DL-ULTRA27', 7.1, 37.8, 61.5, 22.0, 'Publico', 'PRD024', 7, 1, 'UltraSharp 27"', 'Monitor 4K, USB-C, color calibrado', 'Monitor 4K UltraSharp con calibración de color profesional.', 1, '/img/products/ultrasharp.jpg', '2023-01-15', 1, 365, 699.99, 15, 15),
-('LN-THINKX1', 1.09, 1.49, 32.3, 21.7, 'Publico', 'PRD025', 8, 4, 'ThinkPad X1 Carbon', 'Laptop 14", i7, 16GB, 1TB SSD', 'ThinkPad X1 Carbon con teclado ergonómico y seguridad avanzada.', 1, '/img/products/thinkpad.jpg', '2023-01-15', 1, 365, 1599.99, 15, 15),
-('LN-YOGA9I', 1.4, 1.67, 31.2, 22.4, 'Publico', 'PRD026', 8, 4, 'Yoga 9i', 'Laptop convertible 14", 2.8K OLED', 'Laptop convertible Yoga 9i con pantalla OLED 2.8K.', 1, '/img/products/yoga.jpg', '2023-01-15', 1, 365, 1399.99, 15, 15),
-('HW-MATE50P', 0.209, 16.2, 7.5, 0.91, 'Publico', 'PRD027', 9, 2, 'Mate 50 Pro', 'Smartphone 256GB, cámara Leica', 'Huawei Mate 50 Pro con sistema de cámaras Leica y HarmonyOS.', 1, '/img/products/mate50.jpg', '2023-01-15', 1, 180, 899.99, 15, 15),
-('HW-MATEPAD', 0.609, 28.6, 18.4, 0.65, 'Publico', 'PRD028', 9, 3, 'MatePad Pro', 'Tablet 12.6", HarmonyOS', 'MatePad Pro con pantalla OLED y soporte para lápiz M-Pencil.', 1, '/img/products/matepad.jpg', '2023-01-15', 1, 180, 799.99, 15, 15),
-('NK-G50', 0.189, 16.5, 7.6, 0.89, 'Publico', 'PRD029', 10, 2, 'G50', 'Smartphone 128GB, 5G, batería 5000mAh', 'Nokia G50 con 5G, batería de larga duración y Android puro.', 1, '/img/products/nokia_g50.jpg', '2023-01-15', 1, 365, 299.99, 15, 15);
+('SM-GS23-256', 0.168, 14.6, 7.0, 0.76, 'Publico', 'PRD001', 1, 2, 'Galaxy S23', 'Smartphone 256GB, 8GB RAM, Snapdragon 8 Gen 2', 'El Galaxy S23 ofrece un rendimiento excepcional con su procesador Snapdragon 8 Gen 2 y cámara de alta resolución.', 1, '/img/products/galaxy_s23.jpg', '2023-01-15', 365, 999.99, 15, 15),
+
+('SM-GS21-128', 0.169, 14.7, 7.1, 0.78, 'Publico', 'PRD002', 1, 2, 'Galaxy S21', 'Smartphone 128GB, 8GB RAM', 'Galaxy S21 con pantalla Dynamic AMOLED 2X y sistema de cámaras profesional.', 1, '/img/products/galaxy_s21.jpg', '2023-01-15', 365, 699.99, 15, 15),
+
+('SM-QLED55', 18.5, 71.0, 122.0, 5.5, 'Publico', 'PRD003', 1, 5, 'QLED TV 55"', 'Televisor 4K QLED 55 pulgadas, Smart TV', 'Televisor QLED 4K con tecnología Quantum Dot para colores más vivos y realistas.', 1, '/img/products/qled_tv.jpg', '2023-01-15', 730, 899.99, 15, 15),
+
+('SM-GTABS9', 0.498, 25.4, 16.5, 0.59, 'Publico', 'PRD004', 1, 3, 'Galaxy Tab S9', 'Tablet 11", 256GB, S-Pen incluido', 'Tablet premium con S-Pen incluido, perfecta para creativos y profesionales.', 1, '/img/products/galaxy_tab.jpg', '2023-01-15', 365, 799.99, 15, 15),
+
+('SM-GWATCH6', 0.033, 4.4, 4.4, 1.0, 'Publico', 'PRD005', 1, 10, 'Galaxy Watch 6', 'Smartwatch 44mm, LTE, ECG', 'Smartwatch con monitor de ECG, seguimiento de sueño y conectividad LTE.', 1, '/img/products/galaxy_watch.jpg', '2023-01-15', 365, 349.99, 15, 15),
+
+('SM-GS7-OLD', 0.152, 14.2, 6.9, 0.79, 'Privado', 'PRD006', 1, 2, 'Galaxy S7', 'Smartphone antiguo descontinuado', 'Modelo descontinuado, disponible solo para reposición de garantías.', 0, '/img/products/galaxy_s7.jpg', '2023-01-15', 0, 99.99, 15, 15),
+
+('LG-OLED65', 25.8, 81.5, 144.0, 4.6, 'Publico', 'PRD007', 2, 5, 'OLED TV 65"', 'Televisor OLED 65 pulgadas, 4K, WebOS', 'Televisor OLED con colores perfectos y sistema operativo webOS.', 1, '/img/products/lg_oled.jpg', '2023-01-15', 730, 1499.99, 15, 15),
+
+('LG-GRAM17', 1.35, 1.68, 38.0, 26.0, 'Publico', 'PRD008', 2, 4, 'Gram 17"', 'Laptop ultrabook 17", 16GB RAM, 1TB SSD', 'Laptop ultraligera con pantalla de 17 pulgadas y gran capacidad de almacenamiento.', 1, '/img/products/lg_gram.jpg', '2023-01-15', 365, 1699.99, 15, 15),
+
+('LG-MON27', 5.2, 37.6, 61.2, 21.5, 'Publico', 'PRD009', 2, 1, 'Monitor 27" 4K', 'Monitor IPS 27", 4K UHD, HDR10', 'Monitor 4K UHD con tecnología IPS para ángulos de visión amplios.', 1, '/img/products/lg_monitor.jpg', '2023-01-15', 365, 499.99, 15, 15),
+
+('AP-IP15P', 0.187, 14.7, 7.1, 0.82, 'Publico', 'PRD010', 3, 2, 'iPhone 15 Pro', 'Smartphone 256GB, Titanio, A17 Pro', 'iPhone 15 Pro con diseño en titanio y el poderoso chip A17 Pro.', 1, '/img/products/iphone15.jpg', '2023-01-15', 365, 1299.99, 15, 15),
+
+('AP-IP14', 0.174, 14.6, 7.1, 0.78, 'Publico', 'PRD011', 3, 2, 'iPhone 14', 'Smartphone 256GB, A15 Bionic', 'iPhone 14 con chip A15 Bionic y sistema de cámaras avanzado.', 1, '/img/products/iphone14.jpg', '2023-01-15', 365, 999.99, 15, 15),
+
+('AP-MBAIR', 1.24, 0.41, 30.4, 21.5, 'Publico', 'PRD012', 3, 4, 'MacBook Air M2', 'Laptop 13", 8GB RAM, 256GB SSD', 'MacBook Air con chip M2, diseño delgado y batería de larga duración.', 1, '/img/products/macbook_air.jpg', '2023-01-15', 365, 1099.99, 15, 15),
+
+('AP-IPAIR5', 0.461, 24.8, 17.8, 0.61, 'Publico', 'PRD013', 3, 3, 'iPad Air 5', 'Tablet 10.9", M1, 64GB', 'iPad Air con chip M1 y compatibilidad con Apple Pencil 2.', 1, '/img/products/ipad_air.jpg', '2023-01-15', 365, 599.99, 15, 15),
+
+('AP-WATCH9', 0.038, 4.5, 3.8, 1.07, 'Publico', 'PRD014', 3, 10, 'Apple Watch Series 9', 'Smartwatch 45mm, GPS', 'Apple Watch Series 9 con GPS y monitor de salud avanzado.', 1, '/img/products/apple_watch.jpg', '2023-01-15', 365, 429.99, 15, 15),
+
+('XM-RN13P', 0.185, 16.1, 7.6, 0.81, 'Publico', 'PRD015', 4, 2, 'Redmi Note 13 Pro', 'Smartphone 256GB, 12GB RAM, 200MP cámara', 'Redmi Note 13 Pro con cámara de 200MP y carga rápida de 120W.', 1, '/img/products/redmi_note.jpg', '2023-01-15', 180, 349.99, 15, 15),
+
+('XM-MITV50', 12.8, 64.5, 111.5, 8.2, 'Publico', 'PRD016', 4, 5, 'Mi TV 4K 50"', 'Televisor 4K Android TV, Dolby Vision', 'Televisor Android TV 4K con soporte Dolby Vision y Atmos.', 1, '/img/products/mi_tv.jpg', '2023-01-15', 365, 449.99, 15, 15),
+
+('XM-13T', 0.202, 16.2, 7.5, 0.85, 'Publico', 'PRD017', 4, 2, 'Xiaomi 13T', 'Smartphone 256GB, MediaTek Dimensity 8200', 'Xiaomi 13T con pantalla AMOLED y cámara Leica.', 1, '/img/products/xiaomi_13t.jpg', '2023-01-15', 180, 599.99, 15, 15),
+
+('SN-WHXM5', 0.25, 8.3, 20.4, 24.3, 'Publico', 'PRD018', 5, 6, 'WH-1000XM5', 'Audífonos noise cancelling, 30h batería', 'Audífonos con cancelación de ruido líder en la industria.', 1, '/img/products/sony_headphones.jpg', '2023-01-15', 365, 399.99, 15, 15),
+
+('SN-PS5', 4.5, 39.0, 26.0, 10.4, 'Publico', 'PRD019', 5, 9, 'PlayStation 5', 'Consola de videojuegos, 1TB SSD', 'Consola PlayStation 5 con SSD ultrarrápido y control DualSense.', 1, '/img/products/ps5.jpg', '2023-01-15', 365, 499.99, 15, 15),
+
+('SN-BRAVIA55', 18.2, 71.5, 122.5, 4.8, 'Publico', 'PRD020', 5, 5, 'Bravia XR 55"', 'Televisor OLED 55", Cognitive Processor XR', 'Televisor Bravia OLED con procesador cognitivo XR.', 1, '/img/products/bravia.jpg', '2023-01-15', 730, 1799.99, 15, 15),
+
+('HP-SPECTRE', 1.34, 1.79, 31.9, 22.0, 'Publico', 'PRD021', 6, 4, 'Spectre x360', 'Laptop convertible 14", OLED, i7, 16GB', 'Laptop convertible con pantalla OLED táctil y procesador i7.', 1, '/img/products/spectre.jpg', '2023-01-15', 365, 1299.99, 15, 15),
+
+('HP-LASERJET', 8.7, 24.3, 39.6, 34.0, 'Publico', 'PRD022', 6, 1, 'LaserJet Pro', 'Impresora láser, WiFi, duplex', 'Impresora láser WiFi con impresión a doble cara automática.', 1, '/img/products/laserjet.jpg', '2023-01-15', 180, 299.99, 15, 15),
+
+('DL-XPS13', 1.27, 1.54, 29.5, 19.9, 'Publico', 'PRD023', 7, 4, 'XPS 13', 'Laptop 13.4", i7, 16GB, 512GB SSD', 'Laptop XPS 13 con pantalla InfinityEdge y diseño premium.', 1, '/img/products/xps13.jpg', '2023-01-15', 365, 1199.99, 15, 15),
+
+('DL-ULTRA27', 7.1, 37.8, 61.5, 22.0, 'Publico', 'PRD024', 7, 1, 'UltraSharp 27"', 'Monitor 4K, USB-C, color calibrado', 'Monitor 4K UltraSharp con calibración de color profesional.', 1, '/img/products/ultrasharp.jpg', '2023-01-15', 365, 699.99, 15, 15),
+
+('LN-THINKX1', 1.09, 1.49, 32.3, 21.7, 'Publico', 'PRD025', 8, 4, 'ThinkPad X1 Carbon', 'Laptop 14", i7, 16GB, 1TB SSD', 'ThinkPad X1 Carbon con teclado ergonómico y seguridad avanzada.', 1, '/img/products/thinkpad.jpg', '2023-01-15', 365, 1599.99, 15, 15),
+
+('LN-YOGA9I', 1.4, 1.67, 31.2, 22.4, 'Publico', 'PRD026', 8, 4, 'Yoga 9i', 'Laptop convertible 14", 2.8K OLED', 'Laptop convertible Yoga 9i con pantalla OLED 2.8K.', 1, '/img/products/yoga.jpg', '2023-01-15', 365, 1399.99, 15, 15),
+
+('HW-MATE50P', 0.209, 16.2, 7.5, 0.91, 'Publico', 'PRD027', 9, 2, 'Mate 50 Pro', 'Smartphone 256GB, cámara Leica', 'Huawei Mate 50 Pro con sistema de cámaras Leica y HarmonyOS.', 1, '/img/products/mate50.jpg', '2023-01-15', 180, 899.99, 15, 15),
+
+('HW-MATEPAD', 0.609, 28.6, 18.4, 0.65, 'Publico', 'PRD028', 9, 3, 'MatePad Pro', 'Tablet 12.6", HarmonyOS', 'MatePad Pro con pantalla OLED y soporte para lápiz M-Pencil.', 1, '/img/products/matepad.jpg', '2023-01-15', 180, 799.99, 15, 15),
+
+('NK-G50', 0.189, 16.5, 7.6, 0.89, 'Publico', 'PRD029', 10, 2, 'G50', 'Smartphone 128GB, 5G, batería 5000mAh', 'Nokia G50 con 5G, batería de larga duración y Android puro.', 1, '/img/products/nokia_g50.jpg', '2023-01-15', 365, 299.99, 15, 15);
 GO
 
 -- Actualizar Productos para tener referencias válidas (Creado_Por = 15 existe)
@@ -985,16 +893,6 @@ VALUES
 (2, 13, 'Devolucion', 1, 7, 8, 'Devolución de cliente', 'DEV-001', '2024-01-25 14:00:00', 550.00);
 GO
 
--- 26. Producto_Precio_Historial
-INSERT INTO Producto_Precio_Historial (FK_Producto, Precio_Anterior, Precio_Nuevo, FK_Usuario, Fecha_Cambio, Motivo)
-VALUES 
-(1, 949.99, 999.99, 15, '2024-01-10 08:00:00', 'Ajuste por inflación'),
-(2, 649.99, 699.99, 15, '2024-01-10 08:05:00', 'Ajuste por inflación'),
-(10, 1199.99, 1299.99, 15, '2024-01-10 08:10:00', 'Ajuste por tipo de cambio'),
-(12, 1049.99, 1099.99, 15, '2024-01-10 08:15:00', 'Ajuste por tipo de cambio'),
-(18, 379.99, 399.99, 15, '2024-01-10 08:20:00', 'Ajuste por costo de importación');
-GO
-
 -- 27. Producto_Imagenes
 INSERT INTO Producto_Imagenes (FK_Producto, URL_Imagen, Es_Principal)
 VALUES 
@@ -1010,16 +908,6 @@ VALUES
 (12, '/img/products/macbook_air_2.jpg', 0);
 GO
 
--- 28. Promociones
-INSERT INTO Promociones (Codigo, Descripcion, Tipo, Valor, Fecha_Inicio, Fecha_Fin, Activo)
-VALUES 
-('BLACKFRIDAY2024', 'Descuento Black Friday', 'Porcentaje', 20.00, '2024-11-25 00:00:00', '2024-11-30 23:59:59', 1),
-('CYBERMONDAY', 'Descuento Cyber Monday', 'Porcentaje', 15.00, '2024-12-02 00:00:00', '2024-12-02 23:59:59', 1),
-('ENVIOGRATIS', 'Envío gratis en compras mayores a $100', 'Envio_Gratis', 0.00, '2024-01-01 00:00:00', '2024-12-31 23:59:59', 1),
-('NAVIDAD2024', 'Promoción Navideña', 'Monto_Fijo', 50.00, '2024-12-15 00:00:00', '2024-12-25 23:59:59', 1),
-('LANZAMIENTO', 'Descuento en lanzamientos', 'Porcentaje', 10.00, '2024-01-01 00:00:00', '2024-12-31 23:59:59', 1);
-GO
-
 -- 29. Carrito_Compras
 INSERT INTO Carrito_Compras (FK_Cliente, FK_Producto, Cantidad, Fecha_Agregado)
 VALUES 
@@ -1029,72 +917,4 @@ VALUES
 (2, 14, 1, '2024-01-29 14:25:00'),
 (3, 12, 1, '2024-01-30 11:15:00'),
 (3, 19, 1, '2024-01-30 11:20:00');
-GO
-
--- 30. Resenas_Productos
-INSERT INTO Resenas_Productos (FK_Cliente, FK_Producto, Calificacion, Comentario, Fecha_Resena, Estado)
-VALUES 
-(1, 1, 5, 'Excelente producto, muy rápido y la cámara es impresionante', '2024-01-20 15:30:00', 'Aprobado'),
-(1, 2, 4, 'Buen teléfono, pero la batería podría ser mejor', '2024-01-22 10:45:00', 'Aprobado'),
-(2, 10, 5, 'El mejor iPhone que he tenido, recomiendo 100%', '2024-01-25 14:20:00', 'Aprobado'),
-(3, 12, 4, 'Muy buena laptop, ligera y potente', '2024-01-28 11:30:00', 'Aprobado'),
-(10, 18, 5, 'Los mejores audífonos con cancelación de ruido', '2024-01-29 16:15:00', 'Aprobado');
-GO
-
--- 31. Envios
-INSERT INTO Envios (FK_Venta, Transportista, Guia_Remision, Costo_Envio, Peso_Total, Dimensiones_Total, Estado_Envio, Fecha_Despacho, Fecha_Estimada_Entrega, Fecha_Real_Entrega, Firmado_Por, Evidencia_Entrega)
-VALUES 
-(1, 'Servientrega', 'EC7890123456789012345678', 5.00, 0.5, '15x8x2 cm', 'Entregado', '2024-01-15 14:00:00', '2024-01-16 18:00:00', '2024-01-16 16:30:00', 'Juan Pérez', '/evidencias/entrega_001.jpg'),
-(2, 'Servientrega', 'EC8901234567890123456789', 5.00, 0.5, '15x8x2 cm', 'Entregado', '2023-12-01 16:00:00', '2023-12-02 18:00:00', '2023-12-02 17:15:00', 'Juan Pérez', '/evidencias/entrega_002.jpg'),
-(3, 'Servientrega', 'EC9012345678901234567890', 8.00, 0.3, '14x7x1 cm', 'Entregado', '2023-12-15 13:00:00', '2023-12-16 18:00:00', '2023-12-16 15:45:00', 'Juan Pérez', '/evidencias/entrega_003.jpg'),
-(4, 'Servientrega', 'EC0123456789012345678901', 5.00, 0.5, '15x8x2 cm', 'Entregado', '2023-09-20 17:00:00', '2023-09-21 18:00:00', '2023-09-21 16:20:00', 'Juan Pérez', '/evidencias/entrega_004.jpg'),
-(5, 'Servientrega', 'EC1234567890123456789012', 10.00, 1.5, '30x21x2 cm', 'En Transito', '2023-07-05 11:00:00', '2023-07-06 18:00:00', NULL, NULL, NULL);
-GO
-
--- 32. Tarifas_Envio
-INSERT INTO Tarifas_Envio (Zona, Peso_Minimo, Peso_Maximo, Precio, Tiempo_Entrega_Dias, Activo, Fecha_Actualizacion)
-VALUES 
-('Quito Norte', 0.0, 1.0, 3.00, 1, 1, '2024-01-01'),
-('Quito Sur', 0.0, 1.0, 3.50, 1, 1, '2024-01-01'),
-('Guayaquil Norte', 0.0, 1.0, 4.00, 1, 1, '2024-01-01'),
-('Guayaquil Sur', 0.0, 1.0, 4.50, 1, 1, '2024-01-01'),
-('Resto Pichincha', 0.0, 1.0, 5.00, 2, 1, '2024-01-01'),
-('Resto Guayas', 0.0, 1.0, 6.00, 2, 1, '2024-01-01'),
-('Nacional', 0.0, 1.0, 8.00, 3, 1, '2024-01-01'),
-('Pesado 1-5kg', 1.0, 5.0, 12.00, 2, 1, '2024-01-01'),
-('Pesado 5-10kg', 5.0, 10.0, 20.00, 3, 1, '2024-01-01');
-GO
-
--- 33. Impuestos_Configuracion
-INSERT INTO Impuestos_Configuracion (Codigo_Impuesto, Nombre, Porcentaje, Aplicable_A, Fecha_Vigencia_Inicio, Fecha_Vigencia_Fin, Activo)
-VALUES 
-('IVA', 'Impuesto al Valor Agregado', 12.00, 'Todos', '2023-01-01', NULL, 1),
-('ICE-A', 'Impuesto a los Consumos Especiales - Alcohol', 25.00, 'Bebidas Alcohólicas', '2023-01-01', NULL, 1),
-('ICE-B', 'Impuesto a los Consumos Especiales - Tabaco', 50.00, 'Cigarrillos', '2023-01-01', NULL, 1),
-('ICE-C', 'Impuesto a los Consumos Especiales - Vehículos', 10.00, 'Vehículos', '2023-01-01', NULL, 1),
-('IRBPNR', 'Impuesto a la Renta a No Residentes', 1.00, 'Servicios Digitales', '2023-01-01', NULL, 1);
-GO
-
--- 34. Producto_Impuestos
-INSERT INTO Producto_Impuestos (FK_Producto, FK_Impuesto, Porcentaje_Aplicado, Fecha_Vigencia, Activo)
-VALUES 
-(1, 1, 12.00, '2024-01-01', 1),
-(2, 1, 12.00, '2024-01-01', 1),
-(10, 1, 12.00, '2024-01-01', 1),
-(12, 1, 12.00, '2024-01-01', 1),
-(18, 1, 12.00, '2024-01-01', 1),
-(19, 1, 12.00, '2024-01-01', 1);
-GO
-
--- 35. Productos_Populares_Cache
-INSERT INTO Productos_Populares_Cache (FK_Producto, Posicion, Ventas_Ultimos_30_Dias, Vistas_Ultimos_30_Dias, Ratio_Conversion, Fecha_Actualizacion)
-VALUES 
-(1, 1, 15, 1200, 1.25, '2024-01-31 23:59:59'),
-(10, 2, 12, 1100, 1.09, '2024-01-31 23:59:59'),
-(12, 3, 8, 950, 0.84, '2024-01-31 23:59:59'),
-(18, 4, 10, 800, 1.25, '2024-01-31 23:59:59'),
-(19, 5, 6, 700, 0.86, '2024-01-31 23:59:59'),
-(2, 6, 5, 600, 0.83, '2024-01-31 23:59:59'),
-(3, 7, 4, 550, 0.73, '2024-01-31 23:59:59'),
-(11, 8, 3, 500, 0.60, '2024-01-31 23:59:59');
 GO

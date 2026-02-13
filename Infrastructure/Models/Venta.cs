@@ -45,8 +45,6 @@ public partial class Venta
 
     public virtual Usuario? CreadoPorNavigation { get; set; }
 
-    public virtual ICollection<Envio> Envios { get; set; } = new List<Envio>();
-
     public virtual Usuario FkEmpresaClienteNavigation { get; set; } = null!;
 
     public virtual Usuario? FkVendedorNavigation { get; set; }

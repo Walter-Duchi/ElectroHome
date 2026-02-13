@@ -11,7 +11,7 @@ public partial class InventarioMovimiento
 
     public int? FkUsuario { get; set; }
 
-    public string? TipoMovimiento { get; set; }
+    public string TipoMovimiento { get; set; } = null!;
 
     public int Cantidad { get; set; }
 

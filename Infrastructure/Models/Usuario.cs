@@ -57,13 +57,7 @@ public partial class Usuario
 
     public virtual ICollection<ComprobanteDeReemplazo> ComprobanteDeReemplazos { get; set; } = new List<ComprobanteDeReemplazo>();
 
-    public virtual ICollection<ConfiguracionGeneral> ConfiguracionGenerals { get; set; } = new List<ConfiguracionGeneral>();
-
     public virtual Usuario? CreadoPorNavigation { get; set; }
-
-    public virtual ICollection<ImpuestosConfiguracion> ImpuestosConfiguracionCreadoPorNavigations { get; set; } = new List<ImpuestosConfiguracion>();
-
-    public virtual ICollection<ImpuestosConfiguracion> ImpuestosConfiguracionModificadoPorNavigations { get; set; } = new List<ImpuestosConfiguracion>();
 
     public virtual ICollection<InventarioMovimiento> InventarioMovimientos { get; set; } = new List<InventarioMovimiento>();
 
@@ -73,15 +67,11 @@ public partial class Usuario
 
     public virtual ICollection<Producto> ProductoModificadoPorNavigations { get; set; } = new List<Producto>();
 
-    public virtual ICollection<ProductoPrecioHistorial> ProductoPrecioHistorials { get; set; } = new List<ProductoPrecioHistorial>();
-
     public virtual ICollection<Reclamo> Reclamos { get; set; } = new List<Reclamo>();
 
     public virtual ICollection<ReclamosProductoSn> ReclamosProductoSns { get; set; } = new List<ReclamosProductoSn>();
 
     public virtual ICollection<Reembolso> Reembolsos { get; set; } = new List<Reembolso>();
-
-    public virtual ICollection<ResenasProducto> ResenasProductos { get; set; } = new List<ResenasProducto>();
 
     public virtual ICollection<TokensDeAcceso> TokensDeAccesos { get; set; } = new List<TokensDeAcceso>();
 
