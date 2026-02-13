@@ -24,9 +24,9 @@ public partial class ReclamosContext : DbContext
 
     public virtual DbSet<ComprobanteProductoReemplazado> ComprobanteProductoReemplazados { get; set; }
 
-    public virtual DbSet<ConfiguracionEmpresa> ConfiguracionEmpresas { get; set; }
-
     public virtual DbSet<ConfiguracionSri> ConfiguracionSris { get; set; }
+
+    public virtual DbSet<DatosEmpresa> DatosEmpresas { get; set; }
 
     public virtual DbSet<InventarioMovimiento> InventarioMovimientos { get; set; }
 
@@ -74,11 +74,11 @@ public partial class ReclamosContext : DbContext
     {
         modelBuilder.Entity<CarritoCompra>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Carrito___3214EC07DD0F8260");
+            entity.HasKey(e => e.Id).HasName("PK__Carrito___3214EC07A505902C");
 
             entity.ToTable("Carrito_Compras");
 
-            entity.HasIndex(e => new { e.FkCliente, e.FkProducto }, "UQ__Carrito___D7022F47D51774B9").IsUnique();
+            entity.HasIndex(e => new { e.FkCliente, e.FkProducto }, "UQ__Carrito___D7022F477BA17834").IsUnique();
 
             entity.Property(e => e.Cantidad).HasDefaultValue(1);
             entity.Property(e => e.FechaAgregado)
@@ -101,7 +101,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Categoria>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Categori__3214EC07F711B340");
+            entity.HasKey(e => e.Id).HasName("PK__Categori__3214EC07AAB3F7AF");
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.Descripcion)
@@ -123,7 +123,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<ComprobanteDeReemplazo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Comproba__3214EC07F124062F");
+            entity.HasKey(e => e.Id).HasName("PK__Comproba__3214EC0744D76FF8");
 
             entity.ToTable("Comprobante_De_Reemplazo");
 
@@ -145,13 +145,13 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<ComprobanteProductoReemplazado>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Comproba__3214EC07A992BB89");
+            entity.HasKey(e => e.Id).HasName("PK__Comproba__3214EC07118DF7A0");
 
             entity.ToTable("Comprobante_Producto_Reemplazado");
 
-            entity.HasIndex(e => e.FkReclamosProductoSn, "UQ__Comproba__0680539CEE6FA45A").IsUnique();
+            entity.HasIndex(e => e.FkReclamosProductoSn, "UQ__Comproba__0680539C14F458F7").IsUnique();
 
-            entity.HasIndex(e => e.FkProductoDeReemplazo, "UQ__Comproba__A8B53DCFD9C57507").IsUnique();
+            entity.HasIndex(e => e.FkProductoDeReemplazo, "UQ__Comproba__A8B53DCF4F9A0F9F").IsUnique();
 
             entity.Property(e => e.FkComprobanteDeReemplazo).HasColumnName("FK_Comprobante_De_Reemplazo");
             entity.Property(e => e.FkProductoDeReemplazo).HasColumnName("FK_Producto_De_Reemplazo");
@@ -173,11 +173,30 @@ public partial class ReclamosContext : DbContext
                 .HasConstraintName("FK__Comproban__FK_Re__5CA1C101");
         });
 
-        modelBuilder.Entity<ConfiguracionEmpresa>(entity =>
+        modelBuilder.Entity<ConfiguracionSri>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Configur__3214EC07F97C30B5");
+            entity.HasKey(e => e.Id).HasName("PK__Configur__3214EC073EC42ED3");
 
-            entity.ToTable("Configuracion_Empresa");
+            entity.ToTable("Configuracion_SRI");
+
+            entity.Property(e => e.Ambiente)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Pruebas");
+            entity.Property(e => e.FechaExpiracionToken)
+                .HasColumnType("datetime")
+                .HasColumnName("Fecha_Expiracion_Token");
+            entity.Property(e => e.TokenAcceso)
+                .HasMaxLength(500)
+                .IsUnicode(false)
+                .HasColumnName("Token_Acceso");
+        });
+
+        modelBuilder.Entity<DatosEmpresa>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Datos_Em__3214EC07711FE288");
+
+            entity.ToTable("Datos_Empresa");
 
             entity.Property(e => e.DireccionMatriz)
                 .HasMaxLength(500)
@@ -197,28 +216,9 @@ public partial class ReclamosContext : DbContext
                 .HasColumnName("RUC_Empresa");
         });
 
-        modelBuilder.Entity<ConfiguracionSri>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Configur__3214EC078F1BD6EF");
-
-            entity.ToTable("Configuracion_SRI");
-
-            entity.Property(e => e.Ambiente)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("Pruebas");
-            entity.Property(e => e.FechaExpiracionToken)
-                .HasColumnType("datetime")
-                .HasColumnName("Fecha_Expiracion_Token");
-            entity.Property(e => e.TokenAcceso)
-                .HasMaxLength(500)
-                .IsUnicode(false)
-                .HasColumnName("Token_Acceso");
-        });
-
         modelBuilder.Entity<InventarioMovimiento>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Inventar__3214EC079E518D7C");
+            entity.HasKey(e => e.Id).HasName("PK__Inventar__3214EC075307ED3A");
 
             entity.ToTable("Inventario_Movimientos");
 
@@ -256,11 +256,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<InventarioUbicacione>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Inventar__3214EC073D1AB889");
+            entity.HasKey(e => e.Id).HasName("PK__Inventar__3214EC073532DEF0");
 
             entity.ToTable("Inventario_Ubicaciones");
 
-            entity.HasIndex(e => e.Codigo, "UQ__Inventar__06370DACEDC20672").IsUnique();
+            entity.HasIndex(e => e.Codigo, "UQ__Inventar__06370DACA3378930").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.CapacidadMaxima).HasColumnName("Capacidad_Maxima");
@@ -282,9 +282,9 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Marca>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Marcas__3214EC072240FF21");
+            entity.HasKey(e => e.Id).HasName("PK__Marcas__3214EC073251D0BD");
 
-            entity.HasIndex(e => e.Nombre, "UQ__Marcas__75E3EFCF469B9635").IsUnique();
+            entity.HasIndex(e => e.Nombre, "UQ__Marcas__75E3EFCF7E04651E").IsUnique();
 
             entity.Property(e => e.Nombre)
                 .HasMaxLength(50)
@@ -293,7 +293,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<MarcaLoEntregoComoReemplazo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Marca_Lo__3214EC07DD71433F");
+            entity.HasKey(e => e.Id).HasName("PK__Marca_Lo__3214EC078775B358");
 
             entity.ToTable("Marca_Lo_Entrego_Como_Reemplazo");
 
@@ -307,11 +307,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<MetodosPago>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Metodos___3214EC0774B2AFA7");
+            entity.HasKey(e => e.Id).HasName("PK__Metodos___3214EC07C40DF636");
 
             entity.ToTable("Metodos_Pago");
 
-            entity.HasIndex(e => e.Tipo, "UQ__Metodos___8E762CB4542DA35C").IsUnique();
+            entity.HasIndex(e => e.Tipo, "UQ__Metodos___8E762CB4E32DA8B3").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.ComisionPorcentaje)
@@ -331,11 +331,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<NumeroSerieProducto>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Numero_S__3214EC075DD8C8A0");
+            entity.HasKey(e => e.Id).HasName("PK__Numero_S__3214EC0704269444");
 
             entity.ToTable("Numero_Serie_Productos");
 
-            entity.HasIndex(e => e.NumeroSerie, "UQ__Numero_S__F7F466E9447EE4DF").IsUnique();
+            entity.HasIndex(e => e.NumeroSerie, "UQ__Numero_S__F7F466E9EDD0B706").IsUnique();
 
             entity.Property(e => e.EstadoInventario)
                 .HasMaxLength(50)
@@ -370,7 +370,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Pago>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Pagos__3214EC07FDB459AA");
+            entity.HasKey(e => e.Id).HasName("PK__Pagos__3214EC0751683D53");
 
             entity.Property(e => e.Cuotas).HasDefaultValue(1);
             entity.Property(e => e.DatosTransaccion)
@@ -412,13 +412,13 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Producto>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC075B9D39DA");
+            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC0768B5D69B");
 
-            entity.HasIndex(e => e.Codigo, "UQ__Producto__06370DACE334D720").IsUnique();
+            entity.HasIndex(e => e.Codigo, "UQ__Producto__06370DAC2014DD12").IsUnique();
 
-            entity.HasIndex(e => e.Sku, "UQ__Producto__CA1ECF0DCC723B0D").IsUnique();
+            entity.HasIndex(e => e.Sku, "UQ__Producto__CA1ECF0DBB3BB579").IsUnique();
 
-            entity.HasIndex(e => new { e.FkMarca, e.Modelo }, "UQ__Producto__F94693C64B5F1C8A").IsUnique();
+            entity.HasIndex(e => new { e.FkMarca, e.Modelo }, "UQ__Producto__F94693C6DB3885D6").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.AltoCm)
@@ -486,7 +486,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<ProductoImagene>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC07AF7B5F55");
+            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC07B5B236E4");
 
             entity.ToTable("Producto_Imagenes");
 
@@ -507,11 +507,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Proveedore>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Proveedo__3214EC074DA62A2C");
+            entity.HasKey(e => e.Id).HasName("PK__Proveedo__3214EC07E292033D");
 
-            entity.HasIndex(e => e.Cedula, "UQ__Proveedo__B4ADFE38801EA1B3").IsUnique();
+            entity.HasIndex(e => e.Cedula, "UQ__Proveedo__B4ADFE387DAD0ACB").IsUnique();
 
-            entity.HasIndex(e => e.Ruc, "UQ__Proveedo__CAF3326BADD14D90").IsUnique();
+            entity.HasIndex(e => e.Ruc, "UQ__Proveedo__CAF3326BD1645574").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.Cedula)
@@ -548,9 +548,9 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Reclamo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Reclamos__3214EC072CD373A1");
+            entity.HasKey(e => e.Id).HasName("PK__Reclamos__3214EC079E952322");
 
-            entity.HasIndex(e => e.CodigoReclamo, "UQ__Reclamos__9ECFA1B2F49FBE17").IsUnique();
+            entity.HasIndex(e => e.CodigoReclamo, "UQ__Reclamos__9ECFA1B26292915B").IsUnique();
 
             entity.Property(e => e.CodigoReclamo)
                 .HasMaxLength(50)
@@ -570,11 +570,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<ReclamosProductoSn>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Reclamos__3214EC072AF85995");
+            entity.HasKey(e => e.Id).HasName("PK__Reclamos__3214EC07D3FF8162");
 
             entity.ToTable("Reclamos_Producto_SN");
 
-            entity.HasIndex(e => e.FkNumeroSerieProductos, "UQ__Reclamos__CB80933E387360BE").IsUnique();
+            entity.HasIndex(e => e.FkNumeroSerieProductos, "UQ__Reclamos__CB80933E13209384").IsUnique();
 
             entity.Property(e => e.Estado)
                 .HasMaxLength(20)
@@ -622,7 +622,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Reembolso>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Reembols__3214EC07B0721BB5");
+            entity.HasKey(e => e.Id).HasName("PK__Reembols__3214EC0758E6AA47");
 
             entity.ToTable("Reembolso");
 
@@ -667,11 +667,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<ReembolsoPorReclamo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Reembols__3214EC07C1ECDD74");
+            entity.HasKey(e => e.Id).HasName("PK__Reembols__3214EC07DF501D8A");
 
             entity.ToTable("Reembolso_Por_Reclamos");
 
-            entity.HasIndex(e => e.FkReclamosProductoSn, "UQ__Reembols__0680539C78C76857").IsUnique();
+            entity.HasIndex(e => e.FkReclamosProductoSn, "UQ__Reembols__0680539CB38D5D4A").IsUnique();
 
             entity.Property(e => e.FkReclamosProductoSn).HasColumnName("FK_Reclamos_Producto_SN");
             entity.Property(e => e.FkReembolso).HasColumnName("FK_Reembolso");
@@ -689,7 +689,7 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<TokensDeAcceso>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__TokensDe__3214EC07EDB654E5");
+            entity.HasKey(e => e.Id).HasName("PK__TokensDe__3214EC073D231E76");
 
             entity.ToTable("TokensDeAcceso");
 
@@ -716,13 +716,13 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Usuario>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Usuarios__3214EC071CCBBB75");
+            entity.HasKey(e => e.Id).HasName("PK__Usuarios__3214EC07C5BAC1F3");
 
-            entity.HasIndex(e => e.Correo, "UQ__Usuarios__60695A19E8245A22").IsUnique();
+            entity.HasIndex(e => e.Correo, "UQ__Usuarios__60695A19CB494AA0").IsUnique();
 
-            entity.HasIndex(e => e.Ruc, "UQ__Usuarios__CAF3326B65CA8792").IsUnique();
+            entity.HasIndex(e => e.Ruc, "UQ__Usuarios__CAF3326B06B75272").IsUnique();
 
-            entity.HasIndex(e => e.Identificacion, "UQ__Usuarios__D6F931E5E1CD17AC").IsUnique();
+            entity.HasIndex(e => e.Identificacion, "UQ__Usuarios__D6F931E53FB08169").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.Apellidos)
@@ -800,11 +800,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<UsuariosCertificacionMarca>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Usuarios__3214EC0786014EBE");
+            entity.HasKey(e => e.Id).HasName("PK__Usuarios__3214EC07E68F79A5");
 
             entity.ToTable("Usuarios_Certificacion_Marcas");
 
-            entity.HasIndex(e => new { e.FkMarca, e.FkTecnico }, "UQ__Usuarios__F20B19AE4A634A38").IsUnique();
+            entity.HasIndex(e => new { e.FkMarca, e.FkTecnico }, "UQ__Usuarios__F20B19AE92F9117E").IsUnique();
 
             entity.Property(e => e.FkMarca).HasColumnName("FK_Marca");
             entity.Property(e => e.FkTecnico).HasColumnName("FK_Tecnico");
@@ -822,9 +822,9 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<Venta>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Ventas__3214EC0729F78E56");
+            entity.HasKey(e => e.Id).HasName("PK__Ventas__3214EC07144CB501");
 
-            entity.HasIndex(e => e.CodigoFactura, "UQ__Ventas__BB514FC10E527B3B").IsUnique();
+            entity.HasIndex(e => e.CodigoFactura, "UQ__Ventas__BB514FC1A845193A").IsUnique();
 
             entity.Property(e => e.ClaveAcceso)
                 .HasMaxLength(100)
@@ -905,11 +905,11 @@ public partial class ReclamosContext : DbContext
 
         modelBuilder.Entity<VentasPorNumeroSerieProducto>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Ventas_P__3214EC0700BF199F");
+            entity.HasKey(e => e.Id).HasName("PK__Ventas_P__3214EC076D0AC7FC");
 
             entity.ToTable("Ventas_Por_Numero_Serie_Productos");
 
-            entity.HasIndex(e => e.FkNumeroSerieProducto, "UQ__Ventas_P__8FE47B8B3295EFFF").IsUnique();
+            entity.HasIndex(e => e.FkNumeroSerieProducto, "UQ__Ventas_P__8FE47B8B9C4B2364").IsUnique();
 
             entity.Property(e => e.Descuento)
                 .HasDefaultValue(0m)

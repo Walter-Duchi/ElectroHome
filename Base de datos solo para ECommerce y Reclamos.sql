@@ -114,7 +114,8 @@ CREATE TABLE Configuracion_SRI(
     Fecha_Expiracion_Token DATETIME
 );
 
-CREATE TABLE Configuracion_Empresa(
+-- Tabla Configuración Empresa
+CREATE TABLE Datos_Empresa(
     Id INT IDENTITY(1,1) PRIMARY KEY,
     RUC_Empresa VARCHAR(13) NOT NULL,
     Nombre_Comercial VARCHAR(300) NOT NULL,
