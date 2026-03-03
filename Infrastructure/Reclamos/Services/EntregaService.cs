@@ -1,17 +1,12 @@
-﻿using Infrastructure.Data;
+﻿using Application.DTOs.Reclamos.Entrega;
+using Infrastructure.Data;
 using Infrastructure.Models;
+using Infrastructure.Reclamos.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.IO;
-using Application.DTOs.Reclamos.Entrega;
-using Infrastructure.Reclamos.Interfaces;
 
 namespace Infrastructure.Reclamos.Services
 {

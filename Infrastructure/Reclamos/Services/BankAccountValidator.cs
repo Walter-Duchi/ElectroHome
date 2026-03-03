@@ -1,6 +1,4 @@
-﻿using System.Text.RegularExpressions;
-
-namespace Infrastructure.Reclamos.Services
+﻿namespace Infrastructure.Reclamos.Services
 {
     public interface IBankAccountValidator
     {

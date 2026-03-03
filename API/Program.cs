@@ -1,22 +1,22 @@
+using Application.DTOs.Admin;
+using Application.DTOs.Auth;
+using Application.DTOs.Reclamos.Cliente;
+using Application.DTOs.Reclamos.Entrega;
+using Application.DTOs.Reclamos.Reclamo;
+using Application.DTOs.Reclamos.Tecnico;
+using Application.DTOs.Reclamos.User;
 using Infrastructure.Data;
+using Infrastructure.Reclamos.Interfaces;
+using Infrastructure.Reclamos.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using QuestPDF.Infrastructure;
 using System.Security.Claims;
 using System.Text;
-using QuestPDF.Infrastructure;
-using Application.DTOs.Admin;
-using Application.DTOs.Reclamos.Entrega;
-using Application.DTOs.Reclamos.Tecnico;
-using Application.DTOs.Reclamos.Reclamo;
-using Application.DTOs.Reclamos.User;
-using Infrastructure.Reclamos.Services;
-using Infrastructure.Reclamos.Interfaces;
-using Application.DTOs.Auth;
-using Application.DTOs.Reclamos.Cliente;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,7 +66,7 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
-    
+
     // Agregar logging para JWT
     options.Events = new JwtBearerEvents
     {
@@ -118,7 +118,7 @@ app.Use(async (context, next) =>
 {
     var logger = app.Logger;
     var request = context.Request;
-    
+
     logger.LogInformation("=========================================");
     logger.LogInformation("NUEVA PETICIÓN HTTP");
     logger.LogInformation("Método: {Method}", request.Method);
@@ -131,9 +131,9 @@ app.Use(async (context, next) =>
         logger.LogInformation("  {Header}: {Value}", header.Key, header.Value);
     }
     logger.LogInformation("=========================================");
-    
+
     await next();
-    
+
     logger.LogInformation("RESPUESTA: Status {StatusCode}", context.Response.StatusCode);
 });
 
@@ -150,11 +150,11 @@ if (app.Environment.IsDevelopment())
         {
             var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
             logger.LogError(ex, "EXCEPCIÓN NO MANEJADA: {Message}", ex.Message);
-            
+
             // Log detallado
             logger.LogError("Stack Trace: {StackTrace}", ex.StackTrace);
             logger.LogError("Inner Exception: {InnerException}", ex.InnerException?.Message);
-            
+
             throw;
         }
     });
@@ -210,7 +210,7 @@ if (app.Environment.IsDevelopment())
         endpoints.Run(async context =>
         {
             var endpointDataSource = context.RequestServices.GetRequiredService<EndpointDataSource>();
-            
+
             await context.Response.WriteAsJsonAsync(new
             {
                 message = "Rutas disponibles en la API",
@@ -420,39 +420,39 @@ app.MapPost("/api/reclamos/crear", [Authorize(Roles = "Revisor")] async (CrearRe
 app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         logger.LogInformation("=== INICIO ENDPOINT /api/tecnico/productos ===");
-        
+
         // Obtener ID del técnico del token
         var user = httpContext.User;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var userRole = user.FindFirst(ClaimTypes.Role)?.Value;
-        
+
         logger.LogInformation("Usuario autenticado - ID: {UserId}, Rol: {UserRole}", userIdClaim, userRole);
-        
+
         if (string.IsNullOrEmpty(userIdClaim))
         {
             logger.LogWarning("No se encontró ID en el token JWT");
             return Results.Unauthorized();
         }
-        
+
         var tecnicoId = int.Parse(userIdClaim);
         logger.LogInformation("Obteniendo productos para técnico ID: {TecnicoId}", tecnicoId);
-        
+
         var productos = await tecnicoService.ObtenerProductosAsignadosAsync(tecnicoId);
-        
+
         logger.LogInformation("Productos obtenidos: {Count}", productos.Count);
         if (productos.Count > 0)
         {
             foreach (var producto in productos)
             {
-                logger.LogInformation("Producto: {Id} - {NumeroSerie} - {Estado}", 
+                logger.LogInformation("Producto: {Id} - {NumeroSerie} - {Estado}",
                     producto.Id, producto.NumeroSerie, producto.Estado);
             }
         }
-        
+
         logger.LogInformation("=== FIN ENDPOINT /api/tecnico/productos ===");
         return Results.Ok(productos);
     }
@@ -460,7 +460,7 @@ app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpC
     {
         logger.LogError(ex, "ERROR en /api/tecnico/productos: {Message}", ex.Message);
         logger.LogError("Stack Trace: {StackTrace}", ex.StackTrace);
-        
+
         return Results.Problem(
             detail: $"Error interno: {ex.Message}",
             statusCode: StatusCodes.Status500InternalServerError,
@@ -472,14 +472,14 @@ app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpC
 app.MapGet("/api/tecnico/proximo-producto", [Authorize(Roles = "Tecnico")] async (HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         logger.LogInformation("=== INICIO ENDPOINT /api/tecnico/proximo-producto ===");
-        
+
         var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
         logger.LogInformation("Buscando próximo producto para técnico ID: {TecnicoId}", tecnicoId);
-        
+
         var producto = await tecnicoService.ObtenerProximoProductoAsync(tecnicoId);
 
         if (producto == null)
@@ -488,9 +488,9 @@ app.MapGet("/api/tecnico/proximo-producto", [Authorize(Roles = "Tecnico")] async
             return Results.NotFound(new { message = "No hay productos pendientes para revisar" });
         }
 
-        logger.LogInformation("Próximo producto encontrado: ID={Id}, Serie={NumeroSerie}", 
+        logger.LogInformation("Próximo producto encontrado: ID={Id}, Serie={NumeroSerie}",
             producto.Id, producto.NumeroSerie);
-        
+
         logger.LogInformation("=== FIN ENDPOINT /api/tecnico/proximo-producto ===");
         return Results.Ok(producto);
     }
@@ -505,7 +505,7 @@ app.MapGet("/api/tecnico/proximo-producto", [Authorize(Roles = "Tecnico")] async
 app.MapGet("/api/tecnico/validar-orden/{id}", [Authorize(Roles = "Tecnico")] async (int id, HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         logger.LogInformation("Validando orden para producto ID: {ProductoId}", id);
@@ -529,16 +529,16 @@ app.MapGet("/api/tecnico/validar-orden/{id}", [Authorize(Roles = "Tecnico")] asy
 app.MapPost("/api/tecnico/iniciar-revision", [Authorize(Roles = "Tecnico")] async (IniciarRevisionRequest request, HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         logger.LogInformation("=== INICIAR REVISIÓN ===");
         logger.LogInformation("Request: {@Request}", request);
-        
+
         var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
         request.TecnicoId = tecnicoId;
 
-        logger.LogInformation("Técnico ID: {TecnicoId} intentando iniciar revisión de producto ID: {ProductoId}", 
+        logger.LogInformation("Técnico ID: {TecnicoId} intentando iniciar revisión de producto ID: {ProductoId}",
             tecnicoId, request.ReclamoProductoSnId);
 
         var resultado = await tecnicoService.IniciarRevisionAsync(request);
@@ -563,16 +563,16 @@ app.MapPost("/api/tecnico/iniciar-revision", [Authorize(Roles = "Tecnico")] asyn
 app.MapPost("/api/tecnico/finalizar-revision", [Authorize(Roles = "Tecnico")] async (FinalizarRevisionRequest request, HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         logger.LogInformation("=== FINALIZAR REVISIÓN ===");
         logger.LogInformation("Request: {@Request}", request);
-        
+
         var tecnicoId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
         request.TecnicoId = tecnicoId;
 
-        logger.LogInformation("Técnico ID: {TecnicoId} finalizando revisión de producto ID: {ProductoId}", 
+        logger.LogInformation("Técnico ID: {TecnicoId} finalizando revisión de producto ID: {ProductoId}",
             tecnicoId, request.ReclamoProductoSnId);
 
         // Validaciones adicionales
@@ -596,7 +596,7 @@ app.MapPost("/api/tecnico/finalizar-revision", [Authorize(Roles = "Tecnico")] as
             return Results.BadRequest(new { message = "No se pudo finalizar la revisión" });
         }
 
-        logger.LogInformation("Revisión finalizada exitosamente para producto ID: {ProductoId}. Estado: {Estado}", 
+        logger.LogInformation("Revisión finalizada exitosamente para producto ID: {ProductoId}. Estado: {Estado}",
             request.ReclamoProductoSnId, request.Estado);
         return Results.Ok(new { message = "Revisión finalizada exitosamente" });
     }
@@ -614,7 +614,7 @@ app.MapGet("/debug/endpoints", (IEnumerable<EndpointDataSource> endpointSources)
 {
     var endpoints = endpointSources.SelectMany(es => es.Endpoints);
     var result = new List<object>();
-    
+
     foreach (var endpoint in endpoints)
     {
         if (endpoint is RouteEndpoint routeEndpoint)
@@ -627,7 +627,7 @@ app.MapGet("/debug/endpoints", (IEnumerable<EndpointDataSource> endpointSources)
             });
         }
     }
-    
+
     return Results.Ok(result);
 }).AllowAnonymous();
 
@@ -637,34 +637,34 @@ app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> 
     try
     {
         logger.LogInformation("=== DIAGNÓSTICO DEL SISTEMA ===");
-        
+
         // Verificar conexión a BD
         var canConnect = await context.Database.CanConnectAsync();
         logger.LogInformation("Conexión a BD: {CanConnect}", canConnect);
-        
+
         // Contar registros en tablas clave
         var tecnicosCount = await context.Usuarios.CountAsync(u => u.Rol == "Tecnico");
         var productosCount = await context.ReclamosProductoSns.CountAsync();
         var productosConTecnico = await context.ReclamosProductoSns
             .Where(rps => rps.FkTecnicoAsignado != null)
             .CountAsync();
-        
+
         logger.LogInformation("Técnicos en BD: {TecnicosCount}", tecnicosCount);
         logger.LogInformation("Total productos en reclamos: {ProductosCount}", productosCount);
         logger.LogInformation("Productos con técnico asignado: {ConTecnico}", productosConTecnico);
-        
+
         // Listar técnicos
         var tecnicos = await context.Usuarios
             .Where(u => u.Rol == "Tecnico")
             .Select(u => new { u.Id, u.Nombres, u.Apellidos, u.Correo })
             .ToListAsync();
-            
+
         // Listar productos asignados
         var productosAsignados = await context.ReclamosProductoSns
             .Include(rps => rps.FkTecnicoAsignadoNavigation)
             .Where(rps => rps.FkTecnicoAsignado != null)
-            .Select(rps => new 
-            { 
+            .Select(rps => new
+            {
                 rps.Id,
                 NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie,
                 TécnicoId = rps.FkTecnicoAsignado,
@@ -672,7 +672,7 @@ app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> 
                 rps.Estado
             })
             .ToListAsync();
-        
+
         return Results.Ok(new
         {
             timestamp = DateTime.Now,

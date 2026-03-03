@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Application.DTOs.Reclamos.Cliente
+﻿namespace Application.DTOs.Reclamos.Cliente
 {
     public class ClienteDashboardResponse
     {

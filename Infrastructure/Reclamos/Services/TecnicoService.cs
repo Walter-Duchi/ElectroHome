@@ -1,15 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Application.DTOs.Reclamos.Tecnico;
 using Infrastructure.Data;
-using Infrastructure.Models;
-using System.IO;
-using Microsoft.Extensions.Configuration;
-using Application.DTOs.Reclamos.Tecnico;
 using Infrastructure.Reclamos.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Reclamos.Services
 {
@@ -42,7 +36,7 @@ namespace Infrastructure.Reclamos.Services
         {
             using var activity = new System.Diagnostics.Activity("ObtenerProductosAsignados");
             activity.Start();
-            
+
             try
             {
                 _logger.LogInformation("=== INICIO ObtenerProductosAsignadosAsync ===");
@@ -77,13 +71,13 @@ namespace Infrastructure.Reclamos.Services
                     _logger.LogDebug("No se pudo obtener QueryString.");
                 }
 
-                _logger.LogInformation("Total de registros encontrados antes de selección: {Count}", 
+                _logger.LogInformation("Total de registros encontrados antes de selección: {Count}",
                     await query.CountAsync());
 
                 // Primero obtener datos básicos sin el cálculo complejo
                 var queryResult = await query
                     .OrderBy(rps => rps.FechaReclamoClienteFinal)
-                    .Select(rps => new 
+                    .Select(rps => new
                     {
                         Id = rps.Id,
                         NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie,
@@ -123,13 +117,13 @@ namespace Infrastructure.Reclamos.Services
                 }).ToList();
 
                 _logger.LogInformation("Productos obtenidos: {Cantidad}", productos.Count);
-                
+
                 if (productos.Count > 0)
                 {
                     _logger.LogInformation("Detalle de productos:");
                     foreach (var p in productos)
                     {
-                        _logger.LogInformation("  - ID: {Id}, Serie: {Serie}, Estado: {Estado}, Marca: {Marca}", 
+                        _logger.LogInformation("  - ID: {Id}, Serie: {Serie}, Estado: {Estado}, Marca: {Marca}",
                             p.Id, p.NumeroSerie, p.Estado, p.Marca);
                     }
                 }
@@ -142,7 +136,7 @@ namespace Infrastructure.Reclamos.Services
                 _logger.LogError(ex, "ERROR en ObtenerProductosAsignadosAsync para técnico ID: {TecnicoId}", tecnicoId);
                 _logger.LogError("Stack Trace: {StackTrace}", ex.StackTrace);
                 _logger.LogError("Inner Exception: {InnerException}", ex.InnerException?.Message);
-                
+
                 throw new Exception($"Error al obtener productos asignados: {ex.Message}", ex);
             }
         }
@@ -162,7 +156,7 @@ namespace Infrastructure.Reclamos.Services
                     .Where(rps => rps.FkTecnicoAsignado == tecnicoId &&
                                  rps.Estado == "Pendiente")
                     .OrderBy(rps => rps.FechaReclamoClienteFinal)
-                    .Select(rps => new 
+                    .Select(rps => new
                     {
                         Id = rps.Id,
                         NumeroSerie = rps.FkNumeroSerieProductosNavigation.NumeroSerie,

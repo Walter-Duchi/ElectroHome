@@ -1,5 +1,4 @@
 ﻿using Application.DTOs.Reclamos.Cliente;
-using System.Security.Claims;
 
 namespace Infrastructure.Reclamos.Interfaces
 {

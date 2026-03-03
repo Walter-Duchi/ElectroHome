@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace Infrastructure.Reclamos.Interfaces
+﻿namespace Infrastructure.Reclamos.Interfaces
 {
     public interface IEmailService
     {

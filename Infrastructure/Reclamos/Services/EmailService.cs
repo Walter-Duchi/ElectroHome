@@ -1,11 +1,9 @@
-﻿using MailKit.Net.Smtp;
+﻿using Infrastructure.Reclamos.Interfaces;
+using MailKit.Net.Smtp;
 using MailKit.Security;
-using MimeKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
-using Infrastructure.Reclamos.Interfaces;
+using MimeKit;
 
 namespace Infrastructure.Reclamos.Services
 {
