@@ -12,6 +12,8 @@ import RevisarProducto from '../components/Tecnico/RevisarProducto';
 import EntregaDashboard from '../components/Entrega/EntregaDashboard';
 import ClienteDashboard from '../components/Cliente/ClienteDashboard';
 import DatosEmpresaConfig from '../components/Admin/DatosEmpresaConfig';
+import EcommerceHome from '../components/Ecommerce/EcommerceHome';
+import Cart from '../components/Ecommerce/Cart';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -32,8 +34,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   return <>{children}</>;
 };
 
-// Componente que decide qué mostrar en la ruta raíz según el rol
-const RoleBasedHome: React.FC = () => {
+// Componente que decide qué dashboard mostrar dentro de /app según el rol
+const DashboardRouter: React.FC = () => {
   const { auth } = useAuth();
 
   switch (auth.user?.rol) {
@@ -45,10 +47,9 @@ const RoleBasedHome: React.FC = () => {
       return <TecnicoDashboard />;
     case 'Personal de Entrega':
       return <EntregaDashboard />;
-    case 'Administrador': // NUEVO: Para administrador se muestra la configuración de la empresa
+    case 'Administrador':
       return <DatosEmpresaConfig />;
     default:
-      // Si no hay rol definido, mostrar una pantalla de error o redirigir
       return (
         <Box sx={{ p: 3, textAlign: 'center' }}>
           <h2>Rol no reconocido</h2>
@@ -59,7 +60,7 @@ const RoleBasedHome: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { auth, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -77,7 +78,7 @@ const AppContent: React.FC = () => {
         <CircularProgress sx={{ color: 'white', mb: 2 }} size={60} />
         <Box sx={{ typography: 'h6' }}>Cargando sistema...</Box>
         <Box sx={{ typography: 'body2', mt: 1, opacity: 0.8 }}>
-          Sistema de Gestión Corporativa
+          ElectroHome - E-commerce
         </Box>
       </Box>
     );
@@ -87,61 +88,33 @@ const AppContent: React.FC = () => {
     <Router>
       <Routes>
         {/* Rutas públicas */}
-        <Route
-          path="/login"
-          element={
-            auth.isAuthenticated ? <Navigate to="/" replace /> : <LoginForm />
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            auth.isAuthenticated ? (
-              <Navigate to="/" replace />
-            ) : (
-              <ForgotPasswordForm />
-            )
-          }
-        />
-        <Route
-          path="/reset-password"
-          element={
-            auth.isAuthenticated ? (
-              <Navigate to="/" replace />
-            ) : (
-              <ResetPasswordForm />
-            )
-          }
-        />
+        <Route path="/" element={<EcommerceHome />} />
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+        <Route path="/reset-password" element={<ResetPasswordForm />} />
+        <Route path="/cart" element={
+          <ProtectedRoute>
+            <Cart />
+          </ProtectedRoute>
+        } />
 
-        {/* Ruta raíz: Muestra diferente contenido según el rol */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <RoleBasedHome />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+        {/* Rutas protegidas del dashboard (bajo /app) */}
+        <Route path="/app" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DashboardRouter />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/app/tecnico/revisar/:id" element={
+          <ProtectedRoute allowedRoles={['Tecnico']}>
+            <DashboardLayout>
+              <RevisarProducto />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
 
-        {/* Otras rutas específicas que pueden seguir existiendo */}
-        {/* Ruta para revisar producto específico - Solo para Técnicos */}
-        <Route
-          path="/tecnico/revisar/:id"
-          element={
-            <ProtectedRoute allowedRoles={['Tecnico']}>
-              <DashboardLayout>
-                <RevisarProducto />
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Puedes agregar más rutas específicas aquí si las necesitas */}
-
-        {/* Ruta por defecto para cualquier otra ruta */}
+        {/* Ruta por defecto */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

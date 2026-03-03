@@ -102,6 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isAuthenticated: false,
     });
     setUserRole(null);
+    window.location.href = '/'; // antes era '/login'
   };
 
   return (

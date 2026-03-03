@@ -1,5 +1,6 @@
 using Application.DTOs.Admin;
 using Application.DTOs.Auth;
+using Application.DTOs.Ecommerce;
 using Application.DTOs.Reclamos.Cliente;
 using Application.DTOs.Reclamos.Entrega;
 using Application.DTOs.Reclamos.Reclamo;
@@ -96,6 +97,10 @@ builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 builder.Services.AddScoped<IEntregaService, EntregaService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IDatosEmpresaService, DatosEmpresaService>();
+// Servicios de E-commerce
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ICartService, CartService>();
 
 builder.Services.AddCors(options =>
 {
@@ -1026,6 +1031,81 @@ app.MapPut("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] asyn
         logger.LogError(ex, "Error al actualizar datos de la empresa.");
         return Results.Problem($"Error interno: {ex.Message}");
     }
+});
+
+// ============================================
+// ENDPOINTS PARA E-COMMERCE (PÚBLICOS Y AUTENTICADOS)
+// ============================================
+
+// Categorías
+app.MapGet("/api/ecommerce/categorias", async (ICategoryService categoryService) =>
+{
+    var categorias = await categoryService.GetAllCategoriesAsync();
+    return Results.Ok(categorias);
+}).AllowAnonymous();
+
+// Productos con filtros
+app.MapPost("/api/ecommerce/productos", async (ProductFilterRequest filter, IProductService productService) =>
+{
+    var productos = await productService.GetProductsAsync(filter);
+    return Results.Ok(productos);
+}).AllowAnonymous();
+
+// Producto por ID
+app.MapGet("/api/ecommerce/productos/{id:int}", async (int id, IProductService productService) =>
+{
+    var producto = await productService.GetProductByIdAsync(id);
+    return producto is not null ? Results.Ok(producto) : Results.NotFound();
+}).AllowAnonymous();
+
+// Productos populares
+app.MapGet("/api/ecommerce/productos/populares", async (IProductService productService) =>
+{
+    var productos = await productService.GetPopularProductsAsync(10);
+    return Results.Ok(productos);
+}).AllowAnonymous();
+
+// Nuevos productos
+app.MapGet("/api/ecommerce/productos/nuevos", async (IProductService productService) =>
+{
+    var productos = await productService.GetNewArrivalsAsync(10);
+    return Results.Ok(productos);
+}).AllowAnonymous();
+
+// Carrito (requiere autenticación)
+app.MapGet("/api/ecommerce/carrito", [Authorize] async (HttpContext httpContext, ICartService cartService) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var carrito = await cartService.GetCartAsync(usuarioId);
+    return Results.Ok(carrito);
+});
+
+app.MapPost("/api/ecommerce/carrito", [Authorize] async (AddToCartRequest request, HttpContext httpContext, ICartService cartService) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var success = await cartService.AddToCartAsync(usuarioId, request);
+    return success ? Results.Ok() : Results.BadRequest("No se pudo agregar al carrito");
+});
+
+app.MapPut("/api/ecommerce/carrito/{productoId:int}", [Authorize] async (int productoId, int cantidad, HttpContext httpContext, ICartService cartService) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var success = await cartService.UpdateCartItemQuantityAsync(usuarioId, productoId, cantidad);
+    return success ? Results.Ok() : Results.BadRequest();
+});
+
+app.MapDelete("/api/ecommerce/carrito/{productoId:int}", [Authorize] async (int productoId, HttpContext httpContext, ICartService cartService) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var success = await cartService.RemoveFromCartAsync(usuarioId, productoId);
+    return success ? Results.Ok() : Results.BadRequest();
+});
+
+app.MapDelete("/api/ecommerce/carrito", [Authorize] async (HttpContext httpContext, ICartService cartService) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var success = await cartService.ClearCartAsync(usuarioId);
+    return success ? Results.Ok() : Results.BadRequest();
 });
 
 app.Run();

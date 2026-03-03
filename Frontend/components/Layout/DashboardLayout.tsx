@@ -13,7 +13,6 @@ import {
   ListItemText,
   Divider,
   Button,
-  Badge,
   Tooltip,
 } from '@mui/material';
 import {
@@ -31,6 +30,7 @@ import {
   Analytics,
   Inventory,
   ShoppingCart,
+  Store,
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
 import CreateUserModal from '../Navbar/CreateUserModal';
@@ -105,6 +105,18 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             {getDashboardTitle()}
           </Typography>
 
+          {/* Botón para ir a la tienda */}
+          <Tooltip title="Ir a la tienda">
+            <Button
+              color="inherit"
+              startIcon={<Store />}
+              onClick={() => navigate('/')}
+              sx={{ mr: 2 }}
+            >
+              Tienda
+            </Button>
+          </Tooltip>
+
           {canCreateUsers() && (
             <Tooltip title="Crear nuevo usuario">
               <Button
@@ -124,7 +136,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<Engineering />}
-              onClick={() => navigate('/tecnico')}
+              onClick={() => navigate('/app/tecnico')}
               sx={{ mr: 2 }}
             >
               Mis Revisiones
@@ -136,7 +148,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<Receipt />}
-              onClick={() => navigate('/crear-reclamo')}
+              onClick={() => navigate('/app/reclamo')}
               sx={{ mr: 2 }}
             >
               Crear Reclamo
@@ -148,7 +160,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<Assignment />}
-              onClick={() => navigate('/mis-reclamos')}
+              onClick={() => navigate('/app/mis-reclamos')}
               sx={{ mr: 2 }}
             >
               Mis Reclamos
@@ -160,7 +172,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<LocalShipping />}
-              onClick={() => navigate('/entrega')}
+              onClick={() => navigate('/app/entrega')}
               sx={{ mr: 2 }}
             >
               Procesar Entregas
@@ -172,7 +184,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<ShoppingCart />}
-              onClick={() => navigate('/ventas')}
+              onClick={() => navigate('/app/ventas')}
               sx={{ mr: 2 }}
             >
               Ventas
@@ -184,7 +196,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<Analytics />}
-              onClick={() => navigate('/analisis')}
+              onClick={() => navigate('/app/analisis')}
               sx={{ mr: 2 }}
             >
               Análisis
@@ -196,14 +208,12 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="contained"
               color="primary"
               startIcon={<Inventory />}
-              onClick={() => navigate('/inventario')}
+              onClick={() => navigate('/app/inventario')}
               sx={{ mr: 2 }}
             >
               Inventario
             </Button>
           )}
-
-          
 
           <IconButton onClick={handleMenuOpen} color="inherit">
             <AccountCircle />
@@ -250,7 +260,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           <ListItemText>Cerrar Sesión</ListItemText>
         </MenuItem>
       </Menu>
-
 
       <Box
         component="main"

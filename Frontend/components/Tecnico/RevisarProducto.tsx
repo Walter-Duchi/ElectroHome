@@ -171,7 +171,7 @@ const RevisarProducto: React.FC = () => {
                 </Alert>
                 <Button
                     startIcon={<ArrowBack />}
-                    onClick={() => navigate('/tecnico')}
+                    onClick={() => navigate('/app/tecnico')}
                     sx={{ mt: 2 }}
                 >
                     Volver al Dashboard
@@ -186,7 +186,7 @@ const RevisarProducto: React.FC = () => {
             <Box sx={{ mb: 4 }}>
                 <Button
                     startIcon={<ArrowBack />}
-                    onClick={() => navigate('/tecnico')}
+                    onClick={() => navigate('/app/tecnico')}
                     sx={{ mb: 2 }}
                 >
                     Volver
