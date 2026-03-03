@@ -70,7 +70,7 @@ namespace Infrastructure.Reclamos.Services
                         Categoria = p.FkCategoriaNavigation != null ? p.FkCategoriaNavigation.Nombre : null,
                         Descripcion = p.Descripcion,
                         Precio = p.Precio,
-                        ImagenPrincipal = p.ProductoImagenes.FirstOrDefault(pi => (bool) pi.EsPrincipal) != null
+                        ImagenPrincipal = p.ProductoImagenes.FirstOrDefault(pi => (bool)pi.EsPrincipal) != null
                             ? p.ProductoImagenes.First(pi => (bool)pi.EsPrincipal).UrlImagen
                             : p.ImagenUrl,
                         ImagenesAdicionales = p.ProductoImagenes.Where(pi => !(bool)pi.EsPrincipal).Select(pi => pi.UrlImagen).ToList(),
