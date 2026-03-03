@@ -7,7 +7,6 @@ import {
   Typography,
   Button,
   Box,
-  Chip,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -39,6 +38,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
     }
   };
 
+  const hasStock = product.stockDisponible > 0;
+
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardMedia
@@ -64,33 +65,29 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
         }}>
           {product.descripcion}
         </Typography>
-        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ mt: 2 }}>
           <Typography variant="h6" color="primary" fontWeight={600}>
             ${product.precio.toFixed(2)}
           </Typography>
-          {product.stockDisponible > 0 ? (
-            <Chip
-              label={`Stock: ${product.stockDisponible}`}
-              size="small"
-              color="success"
-              variant="outlined"
-            />
-          ) : (
-            <Chip label="Sin stock" size="small" color="error" variant="outlined" />
-          )}
         </Box>
       </CardContent>
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-        <Tooltip title="Añadir al carrito">
-          <IconButton
-            color="primary"
-            onClick={handleAddToCart}
-            disabled={product.stockDisponible === 0}
-          >
-            <AddShoppingCart />
-          </IconButton>
+        <Tooltip title={hasStock ? "Añadir al carrito" : "Producto agotado"}>
+          <span> {/* necesario para tooltip en elemento deshabilitado */}
+            <IconButton
+              color="primary"
+              onClick={handleAddToCart}
+              disabled={!hasStock}
+            >
+              <AddShoppingCart />
+            </IconButton>
+          </span>
         </Tooltip>
-        <Button size="small" variant="outlined" onClick={() => navigate(`/producto/${product.id}`)}>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => navigate(`/producto/${product.id}`)}
+        >
           Ver detalles
         </Button>
       </CardActions>

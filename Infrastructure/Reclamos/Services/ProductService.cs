@@ -25,14 +25,17 @@ namespace Infrastructure.Reclamos.Services
                     .Include(p => p.FkMarcaNavigation)
                     .Include(p => p.FkCategoriaNavigation)
                     .Include(p => p.ProductoImagenes)
-                    .Where(p => p.Activo == true && p.Visibilidad == "Publico");
+                    .Include(p => p.NumeroSerieProductos) // necesario para contar stock
+                    .Where(p => p.Activo == true && p.Visibilidad == "Publico")
+                    // Solo productos con al menos una unidad vendible
+                    .Where(p => p.NumeroSerieProductos.Any(nsp => nsp.EstadoInventario == "Se_Puede_Vender"));
 
                 if (!string.IsNullOrWhiteSpace(filter.Busqueda))
                 {
                     var busqueda = filter.Busqueda.ToLower();
                     query = query.Where(p =>
                         p.Modelo.ToLower().Contains(busqueda) ||
-                        p.Descripcion.ToLower().Contains(busqueda) ||
+                        (p.Descripcion != null && p.Descripcion.ToLower().Contains(busqueda)) ||
                         p.FkMarcaNavigation.Nombre.ToLower().Contains(busqueda));
                 }
 
@@ -73,7 +76,7 @@ namespace Infrastructure.Reclamos.Services
                         ImagenPrincipal = p.ProductoImagenes.FirstOrDefault(pi => (bool)pi.EsPrincipal) != null
                             ? p.ProductoImagenes.First(pi => (bool)pi.EsPrincipal).UrlImagen
                             : p.ImagenUrl,
-                        ImagenesAdicionales = p.ProductoImagenes.Where(pi => !(bool)pi.EsPrincipal).Select(pi => pi.UrlImagen).ToList(),
+                        ImagenesAdicionales = p.ProductoImagenes.Where(pi => (bool)!pi.EsPrincipal).Select(pi => pi.UrlImagen).ToList(),
                         StockDisponible = p.NumeroSerieProductos.Count(nsp => nsp.EstadoInventario == "Se_Puede_Vender"),
                         DiasGarantia = p.DiasGarantia,
                         Activo = (bool)p.Activo
@@ -97,6 +100,7 @@ namespace Infrastructure.Reclamos.Services
                     .Include(p => p.FkMarcaNavigation)
                     .Include(p => p.FkCategoriaNavigation)
                     .Include(p => p.ProductoImagenes)
+                    .Include(p => p.NumeroSerieProductos)
                     .Where(p => p.Id == id && p.Activo == true)
                     .Select(p => new ProductResponse
                     {
@@ -139,7 +143,9 @@ namespace Infrastructure.Reclamos.Services
             var productos = await _context.Productos
                 .Include(p => p.FkMarcaNavigation)
                 .Include(p => p.ProductoImagenes)
+                .Include(p => p.NumeroSerieProductos)
                 .Where(p => p.Activo == true && p.Visibilidad == "Publico")
+                .Where(p => p.NumeroSerieProductos.Any(nsp => nsp.EstadoInventario == "Se_Puede_Vender"))
                 .OrderByDescending(p => p.FechaCreacion)
                 .Take(count)
                 .Select(p => new ProductResponse

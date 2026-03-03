@@ -14,6 +14,8 @@ import ClienteDashboard from '../components/Cliente/ClienteDashboard';
 import DatosEmpresaConfig from '../components/Admin/DatosEmpresaConfig';
 import EcommerceHome from '../components/Ecommerce/EcommerceHome';
 import Cart from '../components/Ecommerce/Cart';
+import ProductDetail from '../components/Ecommerce/ProductDetail';
+
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -92,6 +94,7 @@ const AppContent: React.FC = () => {
         <Route path="/login" element={<LoginForm />} />
         <Route path="/forgot-password" element={<ForgotPasswordForm />} />
         <Route path="/reset-password" element={<ResetPasswordForm />} />
+        <Route path="/producto/:id" element={<ProductDetail />} />
         <Route path="/cart" element={
           <ProtectedRoute>
             <Cart />
