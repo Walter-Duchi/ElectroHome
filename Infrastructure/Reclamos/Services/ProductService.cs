@@ -73,10 +73,10 @@ namespace Infrastructure.Reclamos.Services
                         Categoria = p.FkCategoriaNavigation != null ? p.FkCategoriaNavigation.Nombre : null,
                         Descripcion = p.Descripcion,
                         Precio = p.Precio,
-                        ImagenPrincipal = p.ProductoImagenes.FirstOrDefault(pi => (bool)pi.EsPrincipal) != null
-                            ? p.ProductoImagenes.First(pi => (bool)pi.EsPrincipal).UrlImagen
-                            : p.ImagenUrl,
-                        ImagenesAdicionales = p.ProductoImagenes.Where(pi => (bool)!pi.EsPrincipal).Select(pi => pi.UrlImagen).ToList(),
+                        // Imagen principal: de la columna Imagen_URL de Productos
+                        ImagenPrincipal = p.ImagenUrl ?? "/placeholder.jpg",
+                        // Imágenes adicionales: todas las de Producto_Imagenes
+                        ImagenesAdicionales = p.ProductoImagenes.Select(pi => pi.UrlImagen).ToList(),
                         StockDisponible = p.NumeroSerieProductos.Count(nsp => nsp.EstadoInventario == "Se_Puede_Vender"),
                         DiasGarantia = p.DiasGarantia,
                         Activo = (bool)p.Activo
@@ -111,10 +111,10 @@ namespace Infrastructure.Reclamos.Services
                         Categoria = p.FkCategoriaNavigation != null ? p.FkCategoriaNavigation.Nombre : null,
                         Descripcion = p.Descripcion,
                         Precio = p.Precio,
-                        ImagenPrincipal = p.ProductoImagenes.FirstOrDefault(pi => (bool)pi.EsPrincipal) != null
-                            ? p.ProductoImagenes.First(pi => (bool)pi.EsPrincipal).UrlImagen
-                            : p.ImagenUrl,
-                        ImagenesAdicionales = p.ProductoImagenes.Where(pi => !(bool)pi.EsPrincipal).Select(pi => pi.UrlImagen).ToList(),
+                        // Imagen principal: de la columna Imagen_URL de Productos
+                        ImagenPrincipal = p.ImagenUrl ?? "/placeholder.jpg",
+                        // Imágenes adicionales: todas las de Producto_Imagenes
+                        ImagenesAdicionales = p.ProductoImagenes.Select(pi => pi.UrlImagen).ToList(),
                         StockDisponible = p.NumeroSerieProductos.Count(nsp => nsp.EstadoInventario == "Se_Puede_Vender"),
                         DiasGarantia = p.DiasGarantia,
                         Activo = (bool)p.Activo
@@ -155,9 +155,10 @@ namespace Infrastructure.Reclamos.Services
                     Nombre = $"{p.FkMarcaNavigation.Nombre} {p.Modelo}",
                     Marca = p.FkMarcaNavigation.Nombre,
                     Precio = p.Precio,
-                    ImagenPrincipal = p.ProductoImagenes.FirstOrDefault(pi => (bool)pi.EsPrincipal) != null
-                            ? p.ProductoImagenes.First(pi => (bool)pi.EsPrincipal).UrlImagen
-                            : p.ImagenUrl,
+                    // Imagen principal: de la columna Imagen_URL de Productos
+                    ImagenPrincipal = p.ImagenUrl ?? "/placeholder.jpg",
+                    // Para novedades también podemos enviar las adicionales aunque no se usen en lista
+                    ImagenesAdicionales = p.ProductoImagenes.Select(pi => pi.UrlImagen).ToList(),
                     StockDisponible = p.NumeroSerieProductos.Count(nsp => nsp.EstadoInventario == "Se_Puede_Vender")
                 })
                 .ToListAsync();
