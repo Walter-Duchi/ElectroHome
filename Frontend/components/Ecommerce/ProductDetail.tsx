@@ -89,30 +89,58 @@ const ProductDetail: React.FC = () => {
       <Paper sx={{ p: 3 }}>
         <Grid container spacing={4}>
           {/* Imágenes */}
-          <Grid size={{xs: 12, md:6}}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <img
-                src={selectedImage || '/placeholder.jpg'}
-                alt={product.nombre}
-                style={{ width: '100%', maxHeight: 400, objectFit: 'contain' }}
-              />
+              {/* Contenedor cuadrado para la imagen principal */}
+              <Box
+                sx={{
+                  position: 'relative',
+                  paddingTop: '100%', // 1:1 Aspect Ratio
+                  width: '100%',
+                  overflow: 'hidden',
+                  borderRadius: 2,
+                }}
+              >
+                <img
+                  src={selectedImage || '/placeholder.jpg'}
+                  alt={product.nombre}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              </Box>
+              {/* Miniaturas cuadradas */}
               {product.imagenesAdicionales.length > 0 && (
                 <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
                   {product.imagenesAdicionales.map((img, index) => (
-                    <img
+                    <Box
                       key={index}
-                      src={img}
-                      alt={`${product.nombre} ${index + 1}`}
-                      style={{
+                      sx={{
                         width: 80,
                         height: 80,
-                        objectFit: 'cover',
+                        flexShrink: 0,
                         cursor: 'pointer',
                         border: selectedImage === img ? '2px solid #1976d2' : '1px solid #ddd',
-                        borderRadius: 4
+                        borderRadius: 1,
+                        overflow: 'hidden',
                       }}
                       onClick={() => setSelectedImage(img)}
-                    />
+                    >
+                      <img
+                        src={img}
+                        alt={`${product.nombre} ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    </Box>
                   ))}
                 </Box>
               )}
@@ -120,7 +148,7 @@ const ProductDetail: React.FC = () => {
           </Grid>
 
           {/* Información del producto */}
-          <Grid size={{xs:2, md: 6}}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Typography variant="h4" gutterBottom>
               {product.nombre}
             </Typography>

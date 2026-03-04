@@ -54,7 +54,7 @@ const Cart: React.FC = () => {
     if (newQuantity < 1) return;
     try {
       await cartService.updateQuantity(productoId, newQuantity);
-      await loadCart(); // recargar para obtener el nuevo estado
+      await loadCart();
     } catch (err) {
       setError('Error al actualizar cantidad');
     }
@@ -129,11 +129,27 @@ const Cart: React.FC = () => {
                   <TableRow key={item.id}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <img
-                          src={item.imagenUrl || '/placeholder.jpg'}
-                          alt={item.nombreProducto}
-                          style={{ width: 60, height: 60, objectFit: 'contain', marginRight: 16 }}
-                        />
+                        {/* Contenedor cuadrado para la imagen */}
+                        <Box
+                          sx={{
+                            width: 60,
+                            height: 60,
+                            flexShrink: 0,
+                            mr: 2,
+                            overflow: 'hidden',
+                            borderRadius: 1,
+                          }}
+                        >
+                          <img
+                            src={item.imagenUrl || '/placeholder.jpg'}
+                            alt={item.nombreProducto}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        </Box>
                         <Typography variant="body1">{item.nombreProducto}</Typography>
                       </Box>
                     </TableCell>

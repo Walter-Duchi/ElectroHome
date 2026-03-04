@@ -42,13 +42,22 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardMedia
-        component="img"
-        height="200"
-        image={product.imagenPrincipal || '/placeholder.jpg'}
-        alt={product.nombre}
-        sx={{ objectFit: 'contain', p: 2 }}
-      />
+      {/* Contenedor cuadrado para la imagen */}
+      <Box sx={{ position: 'relative', paddingTop: '100%' /* 1:1 Aspect Ratio */ }}>
+        <CardMedia
+          component="img"
+          image={product.imagenPrincipal || '/placeholder.jpg'}
+          alt={product.nombre}
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover', // Recorta la imagen para llenar el cuadrado sin deformar
+          }}
+        />
+      </Box>
       <CardContent sx={{ flexGrow: 1 }}>
         <Typography gutterBottom variant="h6" component="h2" noWrap>
           {product.nombre}
@@ -73,7 +82,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
       </CardContent>
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Tooltip title={hasStock ? "Añadir al carrito" : "Producto agotado"}>
-          <span> {/* necesario para tooltip en elemento deshabilitado */}
+          <span>
             <IconButton
               color="primary"
               onClick={handleAddToCart}
