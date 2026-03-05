@@ -7,6 +7,7 @@ using Application.DTOs.Reclamos.Reclamo;
 using Application.DTOs.Reclamos.Tecnico;
 using Application.DTOs.Reclamos.User;
 using Infrastructure.Data;
+using Infrastructure.Facturacion.Services;
 using Infrastructure.Reclamos.Interfaces;
 using Infrastructure.Reclamos.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,6 +19,9 @@ using Microsoft.IdentityModel.Tokens;
 using QuestPDF.Infrastructure;
 using System.Security.Claims;
 using System.Text;
+using Yamgooo.SRI.Sign;
+using Yamgooo.SRI.Sign.Extensions;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,10 +101,14 @@ builder.Services.AddScoped<ITecnicoService, TecnicoService>();
 builder.Services.AddScoped<IEntregaService, EntregaService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IDatosEmpresaService, DatosEmpresaService>();
-// Servicios de E-commerce
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IFirmaElectronicaService, FirmaElectronicaService>();
+builder.Services.AddScoped<ISriFacturacionService, SriFacturacionService>();
+builder.Services.AddScoped<IFacturacionService, FacturacionService>();
+builder.Services.AddSriSignService(builder.Configuration, "SriSign");
+
 
 builder.Services.AddCors(options =>
 {
@@ -114,8 +122,7 @@ builder.Services.AddCors(options =>
         });
 });
 
-builder.Services.AddControllers();
-
+builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Middleware para logging de todas las peticiones
@@ -144,6 +151,8 @@ app.Use(async (context, next) =>
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseSwagger();
+    app.UseSwaggerUI();
     app.UseDeveloperExceptionPage();
     app.Use(async (context, next) =>
     {
@@ -1107,5 +1116,22 @@ app.MapDelete("/api/ecommerce/carrito", [Authorize] async (HttpContext httpConte
     var success = await cartService.ClearCartAsync(usuarioId);
     return success ? Results.Ok() : Results.BadRequest();
 });
+
+// ============================================
+// ENDPOINT DE FACTURACIÓN ELECTRÓNICA
+// ============================================
+app.MapPost("/api/facturacion/facturar/{ventaId:int}", async (int ventaId, IFacturacionService facturacionService) =>
+{
+    try
+    {
+        await facturacionService.FacturarVenta(ventaId);
+        return Results.Ok(new { mensaje = "Proceso de facturación iniciado" });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+// .RequireAuthorization(); // Descomenta si quieres requerir autenticación
 
 app.Run();
