@@ -1,6 +1,9 @@
-﻿using System.Threading.Tasks;
+﻿using SriAutorizacion;
 using SriRecepcion;
-using SriAutorizacion;
+using System;
+using System.Threading.Tasks;
+using System.Xml.Serialization;
+using Infrastructure.WcfInspectors;
 
 namespace Infrastructure.Facturacion.Services
 {
@@ -25,6 +28,10 @@ namespace Infrastructure.Facturacion.Services
                 AutorizacionComprobantesOfflineClient.EndpointConfiguration.AutorizacionComprobantesOfflinePort,
                 "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline"
             );
+
+            // Agregar inspector para capturar las respuestas
+            _recepcionClient.Endpoint.EndpointBehaviors.Add(new InspectorBehavior());
+            _autorizacionClient.Endpoint.EndpointBehaviors.Add(new InspectorBehavior());
         }
 
         public async Task<SriRecepcion.validarComprobanteResponse> EnviarComprobante(byte[] xmlFirmado)
@@ -34,13 +41,67 @@ namespace Infrastructure.Facturacion.Services
             try
             {
                 var response = await _recepcionClient.validarComprobanteAsync(request);
-                Console.WriteLine($"Respuesta del SRI: {response.RespuestaRecepcionComprobante.estado}");
-                return response;
+
+                // Intentar serializar la respuesta completa para depuración
+                try
+                {
+                    var serializer = new XmlSerializer(typeof(SriRecepcion.validarComprobanteResponse));
+                    using (var writer = new StringWriter())
+                    {
+                        serializer.Serialize(writer, response);
+                        Console.WriteLine("=== RESPUESTA COMPLETA DEL SRI ===");
+                        Console.WriteLine(writer.ToString());
+                        Console.WriteLine("===================================");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("No se pudo serializar la respuesta: " + ex.Message);
+                }
+
+                if (response?.RespuestaRecepcionComprobante == null)
+                {
+                    Console.WriteLine("La respuesta del SRI es nula o no contiene la estructura esperada.");
+                    // Return a new instance to avoid returning null
+                    return new SriRecepcion.validarComprobanteResponse();
+                }
+                else
+                {
+                    Console.WriteLine($"Respuesta del SRI - Estado: {response.RespuestaRecepcionComprobante.estado ?? "null"}");
+                    if (response.RespuestaRecepcionComprobante.comprobantes?.Length > 0)
+                    {
+                        foreach (var comp in response.RespuestaRecepcionComprobante.comprobantes)
+                        {
+                            Console.WriteLine($"Comprobante: {comp.claveAcceso}, mensajes: {comp.mensajes?.Length}");
+                            if (comp.mensajes != null)
+                            {
+                                foreach (var msg in comp.mensajes)
+                                {
+                                    Console.WriteLine($"  Mensaje: {msg.identificador} - {msg.mensaje1} - {msg.informacionAdicional} - {msg.tipo}");
+                                }
+                            }
+                        }
+                    }
+                }
+                return response!;
+            }
+            catch (System.ServiceModel.FaultException ex)
+            {
+                Console.WriteLine($"FaultException al enviar comprobante: {ex.Message}");
+                try
+                {
+                    var detail = ex.CreateMessageFault()?.GetDetail<string>();
+                    Console.WriteLine($"Detalle: {detail}");
+                }
+                catch { }
+                throw;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error al enviar comprobante: {ex.Message}");
-                throw; // o manejar según tu lógica
+                if (ex.InnerException != null)
+                    Console.WriteLine($"Inner: {ex.InnerException.Message}");
+                throw;
             }
         }
 

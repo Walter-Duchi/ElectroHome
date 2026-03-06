@@ -58,6 +58,9 @@ namespace Infrastructure.Facturacion.Services
             if (venta == null)
                 throw new Exception("Venta no encontrada");
 
+            // Calcular secuencial de 9 dígitos
+            var secuencial = venta.CodigoFactura.Split('-').Last().PadLeft(9, '0');
+
             // 2. Generar XML de factura
             var factura = new Factura
             {
@@ -72,7 +75,7 @@ namespace Infrastructure.Facturacion.Services
                     codDoc = "01",
                     estab = "001",
                     ptoEmi = "001",
-                    secuencial = venta.CodigoFactura.Split('-').Last(),
+                    secuencial = secuencial, // ¡CORREGIDO: ahora son 9 dígitos!
                     dirMatriz = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
                 },
                 InfoFactura = new InfoFactura
@@ -98,8 +101,8 @@ namespace Infrastructure.Facturacion.Services
                         {
                             codigo = "2",
                             codigoPorcentaje = "2", // IVA 12%
-                            baseImponible = venta.TotalCompra / 1.15m,
-                            valor = venta.TotalCompra - (venta.TotalCompra / 1.15m)
+                            baseImponible = Math.Round(venta.TotalCompra / 1.12m, 2),
+                            valor = venta.TotalCompra - Math.Round(venta.TotalCompra / 1.12m, 2)
                         }
                     },
                     propina = 0,
@@ -130,7 +133,7 @@ namespace Infrastructure.Facturacion.Services
                             codigoPorcentaje = "2",
                             tarifa = 12,
                             baseImponible = vp.PrecioVenta,
-                            valor = vp.PrecioVenta * 0.12m
+                            valor = Math.Round(vp.PrecioVenta * 0.12m, 2)
                         }
                     }
                 }).ToList(),
@@ -144,8 +147,7 @@ namespace Infrastructure.Facturacion.Services
                 }
             };
 
-            // Generar clave de acceso
-            var secuencial = venta.CodigoFactura.Split('-').Last().PadLeft(9, '0');
+            // Generar clave de acceso (usa el mismo secuencial de 9 dígitos)
             factura.InfoTributaria.claveAcceso = ClaveAccesoHelper.GenerarClaveAcceso(
                 venta.FechaCompra ?? throw new InvalidOperationException("Fecha de compra no puede ser nula"),
                 factura.InfoTributaria.ruc,
@@ -160,6 +162,9 @@ namespace Infrastructure.Facturacion.Services
             // 3. Firmar electrónicamente
             var xmlFirmado = await _firmaService.FirmarXmlAsync(xmlSinFirma);
 
+            // Guardar XML firmado para inspección manual
+            File.WriteAllText("C:/temp/xmlFirmado.xml", xmlFirmado);
+
             // 4. Enviar al SRI
             var bytesXml = Encoding.UTF8.GetBytes(xmlFirmado);
             SriRecepcion.validarComprobanteResponse respuestaRecepcion;
@@ -167,17 +172,17 @@ namespace Infrastructure.Facturacion.Services
             try
             {
                 respuestaRecepcion = await _sriService.EnviarComprobante(bytesXml);
-                _logger.LogInformation("Respuesta de recepción: {Estado}", respuestaRecepcion.RespuestaRecepcionComprobante.estado);
+                _logger.LogInformation("Respuesta de recepción: {Estado}", respuestaRecepcion?.RespuestaRecepcionComprobante?.estado);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al enviar comprobante al SRI");
                 venta.EstadoSri = "ErrorEnvio";
                 await _context.SaveChangesAsync();
-                throw; // Opcional: relanzar para que el endpoint sepa que falló
+                throw;
             }
 
-            if (respuestaRecepcion.RespuestaRecepcionComprobante.estado == "RECIBIDA")
+            if (respuestaRecepcion?.RespuestaRecepcionComprobante?.estado == "RECIBIDA")
             {
                 try
                 {
@@ -185,7 +190,7 @@ namespace Infrastructure.Facturacion.Services
                     await Task.Delay(3000);
                     var respuestaAutorizacion = await _sriService.ConsultarAutorizacion(factura.InfoTributaria.claveAcceso);
 
-                    if (respuestaAutorizacion.RespuestaAutorizacionComprobante.autorizaciones?.Length > 0)
+                    if (respuestaAutorizacion?.RespuestaAutorizacionComprobante?.autorizaciones?.Length > 0)
                     {
                         var autorizacion = respuestaAutorizacion.RespuestaAutorizacionComprobante.autorizaciones[0];
                         venta.EstadoSri = autorizacion.estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
@@ -213,7 +218,7 @@ namespace Infrastructure.Facturacion.Services
             else
             {
                 venta.EstadoSri = "Rechazado";
-                if (respuestaRecepcion.RespuestaRecepcionComprobante.comprobantes?.Length > 0)
+                if (respuestaRecepcion?.RespuestaRecepcionComprobante?.comprobantes?.Length > 0)
                 {
                     var errores = respuestaRecepcion.RespuestaRecepcionComprobante.comprobantes[0].mensajes;
                     _logger.LogError("Errores en recepción: {@errores}", errores);

@@ -96,10 +96,21 @@ namespace Infrastructure.Facturacion.Models
 
     public class Pago
     {
-        public string formaPago { get; set; } = string.Empty;         // según tabla 24 (ej. 01 = efectivo)
+        [XmlElement("formaPago")]
+        public string formaPago { get; set; } = string.Empty;
+
+        [XmlElement("total")]
         public decimal total { get; set; }
-        public int? plazo { get; set; }                 // opcional
-        public string? unidadTiempo { get; set; }       // opcional
+
+        [XmlElement("plazo")]
+        public int? plazo { get; set; }
+
+        [XmlElement("unidadTiempo")]
+        public string? unidadTiempo { get; set; }
+
+        // Estas propiedades controlan que no se serialicen si son nulas
+        public bool ShouldSerializeplazo() => plazo.HasValue;
+        public bool ShouldSerializeunidadTiempo() => !string.IsNullOrEmpty(unidadTiempo);
     }
 
     public class InfoAdicional
