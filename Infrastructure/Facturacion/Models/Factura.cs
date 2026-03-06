@@ -38,6 +38,7 @@ namespace Infrastructure.Facturacion.Models
         public string ptoEmi { get; set; } = string.Empty;
         public string secuencial { get; set; } = string.Empty;
         public string dirMatriz { get; set; } = string.Empty;
+        public string contribuyenteRimpe { get; set; } = string.Empty;
     }
 
     public class InfoFactura
@@ -76,12 +77,45 @@ namespace Infrastructure.Facturacion.Models
 
     public class Detalle
     {
-        public string codigoPrincipal { get; set; } = string.Empty;
-        public string codigoAuxiliar { get; set; } = string.Empty;
+        private string _codigoPrincipal = string.Empty;
+        private string _codigoAuxiliar = string.Empty;
+
+        [XmlElement("codigoPrincipal")]
+        public string CodigoPrincipal
+        {
+            get => _codigoPrincipal;
+            set => _codigoPrincipal = value ?? string.Empty;
+        }
+
+        [XmlIgnore]
+        public string CodigoAuxiliar
+        {
+            get => _codigoAuxiliar;
+            set => _codigoAuxiliar = value ?? string.Empty;
+        }
+
+        [XmlElement("codigoAuxiliar")]
+        public string CodigoAuxiliarSerializado
+        {
+            get => CodigoAuxiliar;
+            set => CodigoAuxiliar = value;
+        }
+
+        public bool ShouldSerializeCodigoAuxiliarSerializado() => !string.IsNullOrEmpty(CodigoAuxiliar);
+
+        [XmlElement("descripcion")]
         public string descripcion { get; set; } = string.Empty;
+
+        [XmlElement("cantidad")]
         public decimal cantidad { get; set; }
+
+        [XmlElement("precioUnitario")]
         public decimal precioUnitario { get; set; }
+
+        [XmlElement("descuento")]
         public decimal descuento { get; set; }
+
+        [XmlElement("precioTotalSinImpuesto")]
         public decimal precioTotalSinImpuesto { get; set; }
 
         [XmlArray("impuestos")]

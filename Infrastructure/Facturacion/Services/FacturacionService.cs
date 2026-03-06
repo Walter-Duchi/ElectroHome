@@ -77,6 +77,7 @@ namespace Infrastructure.Facturacion.Services
                     ptoEmi = "001",
                     secuencial = secuencial, // ¡CORREGIDO: ahora son 9 dígitos!
                     dirMatriz = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
+                    contribuyenteRimpe = "CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE",
                 },
                 InfoFactura = new InfoFactura
                 {
@@ -119,7 +120,8 @@ namespace Infrastructure.Facturacion.Services
                 },
                 Detalles = venta.VentasPorNumeroSerieProductos.Select(vp => new Detalle
                 {
-                    codigoPrincipal = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "",
+                    CodigoPrincipal = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "",
+                    CodigoAuxiliar = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "", // o algún otro valor, pero puede ser vacío (no se serializará)
                     descripcion = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Descripcion ?? "",
                     cantidad = 1,
                     precioUnitario = vp.PrecioVenta,
