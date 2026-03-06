@@ -235,7 +235,9 @@ namespace Infrastructure.Facturacion.Services
             ns.Add("", "");
             using var stringWriter = new StringWriter();
             serializer.Serialize(stringWriter, factura, ns);
-            return stringWriter.ToString();
+            var xml = stringWriter.ToString();
+            // Reemplazar la declaración de encoding de utf-16 a utf-8
+            return xml.Replace("<?xml version=\"1.0\" encoding=\"utf-16\"?>", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         }
     }
 }

@@ -11,38 +11,42 @@ namespace Infrastructure.Facturacion.Models
         [XmlAttribute("version")]
         public string Version { get; set; } = "1.0.0";
 
+        [XmlElement("infoTributaria")]
         public InfoTributaria InfoTributaria { get; set; } = new InfoTributaria();
+
+        [XmlElement("infoFactura")]
         public InfoFactura InfoFactura { get; set; } = new InfoFactura();
 
         [XmlArray("detalles")]
         [XmlArrayItem("detalle")]
         public List<Detalle> Detalles { get; set; } = new List<Detalle>();
 
+        [XmlElement("infoAdicional")]
         public InfoAdicional InfoAdicional { get; set; } = new InfoAdicional();
     }
 
     public class InfoTributaria
     {
-        public string ambiente { get; set; } = string.Empty;          // 1 = pruebas, 2 = producción
-        public string tipoEmision { get; set; } = string.Empty;       // 1 = normal
+        public string ambiente { get; set; } = string.Empty;
+        public string tipoEmision { get; set; } = string.Empty;
         public string razonSocial { get; set; } = string.Empty;
         public string nombreComercial { get; set; } = string.Empty;
         public string ruc { get; set; } = string.Empty;
         public string claveAcceso { get; set; } = string.Empty;
-        public string codDoc { get; set; } = string.Empty;            // 01 = factura
-        public string estab { get; set; } = string.Empty;             // 3 dígitos
-        public string ptoEmi { get; set; } = string.Empty;            // 3 dígitos
-        public string secuencial { get; set; } = string.Empty;        // 9 dígitos
+        public string codDoc { get; set; } = string.Empty;
+        public string estab { get; set; } = string.Empty;
+        public string ptoEmi { get; set; } = string.Empty;
+        public string secuencial { get; set; } = string.Empty;
         public string dirMatriz { get; set; } = string.Empty;
     }
 
     public class InfoFactura
     {
-        public string fechaEmision { get; set; } = string.Empty;      // dd/mm/aaaa
+        public string fechaEmision { get; set; } = string.Empty;
         public string dirEstablecimiento { get; set; } = string.Empty;
-        public string? contribuyenteEspecial { get; set; } // opcional
-        public string obligadoContabilidad { get; set; } = string.Empty;   // SI/NO
-        public string tipoIdentificacionComprador { get; set; } = string.Empty; // 04=RUC, 05=Cédula, 07=Consumidor final
+        public string? contribuyenteEspecial { get; set; }
+        public string obligadoContabilidad { get; set; } = string.Empty;
+        public string tipoIdentificacionComprador { get; set; } = string.Empty;
         public string razonSocialComprador { get; set; } = string.Empty;
         public string identificacionComprador { get; set; } = string.Empty;
         public string direccionComprador { get; set; } = string.Empty;
@@ -64,8 +68,8 @@ namespace Infrastructure.Facturacion.Models
 
     public class TotalImpuesto
     {
-        public string codigo { get; set; } = string.Empty;            // 2 = IVA
-        public string codigoPorcentaje { get; set; } = string.Empty;  // 2,0,6 según tarifa
+        public string codigo { get; set; } = string.Empty;
+        public string codigoPorcentaje { get; set; } = string.Empty;
         public decimal baseImponible { get; set; }
         public decimal valor { get; set; }
     }
@@ -87,7 +91,7 @@ namespace Infrastructure.Facturacion.Models
 
     public class DetalleImpuesto
     {
-        public string codigo { get; set; } = string.Empty;            // 2 = IVA
+        public string codigo { get; set; } = string.Empty;
         public string codigoPorcentaje { get; set; } = string.Empty;
         public decimal tarifa { get; set; }
         public decimal baseImponible { get; set; }
@@ -102,15 +106,29 @@ namespace Infrastructure.Facturacion.Models
         [XmlElement("total")]
         public decimal total { get; set; }
 
-        [XmlElement("plazo")]
+        [XmlIgnore] // No se serializa si es nulo
         public int? plazo { get; set; }
 
-        [XmlElement("unidadTiempo")]
+        [XmlIgnore]
         public string? unidadTiempo { get; set; }
 
-        // Estas propiedades controlan que no se serialicen si son nulas
-        public bool ShouldSerializeplazo() => plazo.HasValue;
-        public bool ShouldSerializeunidadTiempo() => !string.IsNullOrEmpty(unidadTiempo);
+        // Propiedades auxiliares para serializar solo si tienen valor
+        [XmlElement("plazo")]
+        public decimal PlazoSerializado
+        {
+            get => plazo ?? 0;
+            set => plazo = (int)value;
+        }
+
+        [XmlElement("unidadTiempo")]
+        public string UnidadTiempoSerializada
+        {
+            get => unidadTiempo ?? string.Empty;
+            set => unidadTiempo = value;
+        }
+
+        public bool ShouldSerializePlazoSerializado() => plazo.HasValue;
+        public bool ShouldSerializeUnidadTiempoSerializada() => !string.IsNullOrEmpty(unidadTiempo);
     }
 
     public class InfoAdicional
@@ -123,6 +141,7 @@ namespace Infrastructure.Facturacion.Models
     {
         [XmlAttribute("nombre")]
         public string Nombre { get; set; } = string.Empty;
+
         [XmlText]
         public string Valor { get; set; } = string.Empty;
     }
