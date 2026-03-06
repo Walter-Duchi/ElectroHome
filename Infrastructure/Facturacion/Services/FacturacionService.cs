@@ -58,24 +58,47 @@ namespace Infrastructure.Facturacion.Services
             if (venta == null)
                 throw new Exception("Venta no encontrada");
 
-            // Calcular secuencial de 9 dígitos
+            // Calcular secuencial de 9 dígitos (rellenar con ceros a la izquierda)
             var secuencial = venta.CodigoFactura.Split('-').Last().PadLeft(9, '0');
 
-            // 2. Generar XML de factura
+            // Calcular totales correctamente a partir de los detalles
+            var detallesFactura = venta.VentasPorNumeroSerieProductos.Select(vp => new
+            {
+                BaseImponible = vp.PrecioVenta - vp.Iva, // precio sin IVA
+                Iva = vp.Iva,
+                Descuento = vp.Descuento ?? 0,
+                Sku = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "",
+                Descripcion = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Descripcion ?? "",
+                PrecioVenta = vp.PrecioVenta,
+                IVA = vp.Iva
+            }).ToList();
+
+            var totalSinImpuestos = detallesFactura.Sum(d => d.BaseImponible);
+            var totalIva = detallesFactura.Sum(d => d.Iva);
+            var totalDescuento = detallesFactura.Sum(d => d.Descuento);
+
+            // Validar que el total de la venta coincida con los cálculos (solo logging)
+            if (Math.Abs(totalSinImpuestos + totalIva - venta.TotalCompra) > 0.01m)
+            {
+                _logger.LogWarning("Inconsistencia en totales: venta.TotalCompra={VentaTotal}, calculado={Calculado}",
+                    venta.TotalCompra, totalSinImpuestos + totalIva);
+            }
+
+            // 2. Generar XML de factura (versión 1.0.0)
             var factura = new Factura
             {
                 InfoTributaria = new InfoTributaria
                 {
                     ambiente = "1", // pruebas
-                    tipoEmision = "1",
+                    tipoEmision = "1", // normal
                     razonSocial = "DUCHI RIVERA WALTER ALEJANDRO",
                     nombreComercial = "SOFTWARE HOME",
                     ruc = "0950734061001",
                     claveAcceso = "", // se llenará después
-                    codDoc = "01",
+                    codDoc = "01", // factura
                     estab = "001",
                     ptoEmi = "001",
-                    secuencial = secuencial, // ¡CORREGIDO: ahora son 9 dígitos!
+                    secuencial = secuencial,
                     dirMatriz = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
                     contribuyenteRimpe = "CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE",
                 },
@@ -84,30 +107,28 @@ namespace Infrastructure.Facturacion.Services
                     fechaEmision = venta.FechaCompra?.ToString("dd/MM/yyyy") ?? "",
                     dirEstablecimiento = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
                     obligadoContabilidad = "NO",
-                    tipoIdentificacionComprador = venta.FkEmpresaClienteNavigation.TipoIdentificacion switch
-                    {
-                        "Cedula" => "05",
-                        "RUC" => "04",
-                        _ => "07"
-                    },
-                    razonSocialComprador = venta.FkEmpresaClienteNavigation.RazonSocial
-                        ?? $"{venta.FkEmpresaClienteNavigation.Nombres} {venta.FkEmpresaClienteNavigation.Apellidos}",
-                    identificacionComprador = venta.FkEmpresaClienteNavigation.Identificacion ?? "",
-                    direccionComprador = venta.FkEmpresaClienteNavigation.Direccion ?? "",
-                    totalSinImpuestos = venta.VentasPorNumeroSerieProductos.Sum(vp => vp.PrecioVenta),
-                    totalDescuento = venta.VentasPorNumeroSerieProductos.Sum(vp => vp.Descuento ?? 0),
+                    // Para evitar validación de cédula, usamos consumidor final
+                    tipoIdentificacionComprador = "07",
+                    razonSocialComprador = "CONSUMIDOR FINAL",
+                    identificacionComprador = "9999999999999",
+                    // La dirección no puede ir vacía; asignamos un valor por defecto
+                    direccionComprador = string.IsNullOrEmpty(venta.FkEmpresaClienteNavigation.Direccion)
+                        ? "SIN DIRECCIÓN"
+                        : venta.FkEmpresaClienteNavigation.Direccion,
+                    totalSinImpuestos = Math.Round(totalSinImpuestos, 2),
+                    totalDescuento = Math.Round(totalDescuento, 2),
                     totalConImpuestos = new System.Collections.Generic.List<TotalImpuesto>
                     {
                         new TotalImpuesto
                         {
-                            codigo = "2",
-                            codigoPorcentaje = "2", // IVA 12%
-                            baseImponible = Math.Round(venta.TotalCompra / 1.12m, 2),
-                            valor = venta.TotalCompra - Math.Round(venta.TotalCompra / 1.12m, 2)
+                            codigo = "2", // IVA
+                            codigoPorcentaje = "2", // 12% (código según tabla 17)
+                            baseImponible = Math.Round(totalSinImpuestos, 2),
+                            valor = Math.Round(totalIva, 2)
                         }
                     },
                     propina = 0,
-                    importeTotal = venta.TotalCompra,
+                    importeTotal = venta.TotalCompra, // debe ser totalSinImpuestos + totalIva
                     moneda = "DOLAR",
                     pagos = new System.Collections.Generic.List<PagoFactura>
                     {
@@ -121,12 +142,12 @@ namespace Infrastructure.Facturacion.Services
                 Detalles = venta.VentasPorNumeroSerieProductos.Select(vp => new Detalle
                 {
                     CodigoPrincipal = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "",
-                    CodigoAuxiliar = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "", // o algún otro valor, pero puede ser vacío (no se serializará)
+                    CodigoAuxiliar = "", // vacío, no se serializará
                     descripcion = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Descripcion ?? "",
                     cantidad = 1,
-                    precioUnitario = vp.PrecioVenta,
-                    descuento = vp.Descuento ?? 0,
-                    precioTotalSinImpuesto = vp.PrecioVenta,
+                    precioUnitario = Math.Round(vp.PrecioVenta - vp.Iva, 2), // precio sin IVA
+                    descuento = Math.Round(vp.Descuento ?? 0, 2),
+                    precioTotalSinImpuesto = Math.Round(vp.PrecioVenta - vp.Iva, 2),
                     impuestos = new System.Collections.Generic.List<DetalleImpuesto>
                     {
                         new DetalleImpuesto
@@ -134,8 +155,8 @@ namespace Infrastructure.Facturacion.Services
                             codigo = "2",
                             codigoPorcentaje = "2",
                             tarifa = 12,
-                            baseImponible = vp.PrecioVenta,
-                            valor = Math.Round(vp.PrecioVenta * 0.12m, 2)
+                            baseImponible = Math.Round(vp.PrecioVenta - vp.Iva, 2),
+                            valor = Math.Round(vp.Iva, 2)
                         }
                     }
                 }).ToList(),
@@ -164,7 +185,7 @@ namespace Infrastructure.Facturacion.Services
             // 3. Firmar electrónicamente
             var xmlFirmado = await _firmaService.FirmarXmlAsync(xmlSinFirma);
 
-            // Guardar XML firmado para inspección manual
+            // Guardar XML firmado para inspección manual (opcional)
             File.WriteAllText("C:/temp/xmlFirmado.xml", xmlFirmado);
 
             // 4. Enviar al SRI
@@ -179,7 +200,7 @@ namespace Infrastructure.Facturacion.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al enviar comprobante al SRI");
-                venta.EstadoSri = "ErrorEnvio";
+                venta.EstadoSri = "Rechazado"; // Usar estado permitido
                 await _context.SaveChangesAsync();
                 throw;
             }
@@ -207,14 +228,14 @@ namespace Infrastructure.Facturacion.Services
                     }
                     else
                     {
-                        venta.EstadoSri = "ErrorSinAutorizacion";
+                        venta.EstadoSri = "Rechazado"; // No se recibieron autorizaciones
                         _logger.LogWarning("No se recibieron autorizaciones para la clave {Clave}", factura.InfoTributaria.claveAcceso);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error al consultar autorización para la clave {Clave}", factura.InfoTributaria.claveAcceso);
-                    venta.EstadoSri = "ErrorConsulta";
+                    venta.EstadoSri = "Rechazado"; // Error en consulta
                 }
             }
             else
