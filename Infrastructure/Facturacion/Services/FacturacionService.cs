@@ -119,7 +119,7 @@ namespace Infrastructure.Facturacion.Services
                         new TotalImpuesto
                         {
                             codigo = "2", // IVA
-                            codigoPorcentaje = "2", // 12% (código según tabla 17)
+                            codigoPorcentaje = "4", // 15% (código según tabla 17)
                             baseImponible = Math.Round(totalSinImpuestos, 2),
                             valor = Math.Round(totalIva, 2)
                         }
@@ -150,8 +150,8 @@ namespace Infrastructure.Facturacion.Services
                         new DetalleImpuesto
                         {
                             codigo = "2",
-                            codigoPorcentaje = "2",
-                            tarifa = 12,
+                            codigoPorcentaje = "4",
+                            tarifa = 15,
                             baseImponible = Math.Round(vp.PrecioVenta - vp.Iva, 2),
                             valor = Math.Round(vp.Iva, 2)
                         }
