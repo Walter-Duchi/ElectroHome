@@ -1134,4 +1134,42 @@ app.MapPost("/api/facturacion/facturar/{ventaId:int}", async (int ventaId, IFact
 });
 // .RequireAuthorization(); // Descomenta si quieres requerir autenticación
 
+// Endpoint para consultar autorización de una clave de acceso
+app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso, ISriFacturacionService sriService, ILogger<Program> logger) =>
+{
+    try
+    {
+        logger.LogInformation($"Consultando autorización para clave: {claveAcceso}");
+        var response = await sriService.ConsultarAutorizacion(claveAcceso);
+
+        if (response?.RespuestaAutorizacionComprobante?.autorizaciones?.Length > 0)
+        {
+            var autorizacion = response.RespuestaAutorizacionComprobante.autorizaciones[0];
+            return Results.Ok(new
+            {
+                claveAcceso = claveAcceso,
+                estado = autorizacion.estado,
+                fechaAutorizacion = autorizacion.fechaAutorizacion,
+                numeroAutorizacion = autorizacion.numeroAutorizacion,
+                ambiente = autorizacion.ambiente,
+                comprobante = autorizacion.comprobante // XML autorizado
+            });
+        }
+        else
+        {
+            return Results.Ok(new
+            {
+                claveAcceso = claveAcceso,
+                estado = "NO PROCESADO AÚN",
+                mensaje = "El comprobante aún no ha sido procesado o no existe"
+            });
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error al consultar autorización");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+}).AllowAnonymous(); // Solo para pruebas, luego puedes quitar AllowAnonymous
+
 app.Run();

@@ -107,14 +107,11 @@ namespace Infrastructure.Facturacion.Services
                     fechaEmision = venta.FechaCompra?.ToString("dd/MM/yyyy") ?? "",
                     dirEstablecimiento = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
                     obligadoContabilidad = "NO",
-                    // Para evitar validación de cédula, usamos consumidor final
-                    tipoIdentificacionComprador = "07",
-                    razonSocialComprador = "CONSUMIDOR FINAL",
-                    identificacionComprador = "9999999999999",
-                    // La dirección no puede ir vacía; asignamos un valor por defecto
-                    direccionComprador = string.IsNullOrEmpty(venta.FkEmpresaClienteNavigation.Direccion)
-                        ? "SIN DIRECCIÓN"
-                        : venta.FkEmpresaClienteNavigation.Direccion,
+                    // Para evitar el error de consumidor final con monto > 50 USD, usamos un receptor de prueba
+                    tipoIdentificacionComprador = "04", // RUC
+                    razonSocialComprador = "PRUEBAS SERVICIO DE RENTAS INTERNAS",
+                    identificacionComprador = "1790012347001", // RUC de prueba según ficha técnica
+                    direccionComprador = "QUITO",
                     totalSinImpuestos = Math.Round(totalSinImpuestos, 2),
                     totalDescuento = Math.Round(totalDescuento, 2),
                     totalConImpuestos = new System.Collections.Generic.List<TotalImpuesto>
