@@ -1,6 +1,7 @@
 ﻿using SriAutorizacion;
 using SriRecepcion;
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 using Infrastructure.WcfInspectors;
@@ -10,7 +11,14 @@ namespace Infrastructure.Facturacion.Services
     public interface ISriFacturacionService
     {
         Task<SriRecepcion.validarComprobanteResponse> EnviarComprobante(byte[] xmlFirmado);
-        Task<SriAutorizacion.autorizacionComprobanteResponse> ConsultarAutorizacion(string claveAcceso);
+        Task<RespuestaAutorizacion> ConsultarAutorizacion(string claveAcceso);
+    }
+
+    public class RespuestaAutorizacion
+    {
+        public SriAutorizacion.autorizacionComprobanteResponse? RespuestaDeserializada { get; set; }
+        public string? XmlRespuestaSerializada { get; set; }
+        public string? XmlRespuestaCruda { get; set; }
     }
 
     public class SriFacturacionService : ISriFacturacionService
@@ -62,7 +70,6 @@ namespace Infrastructure.Facturacion.Services
                 if (response?.RespuestaRecepcionComprobante == null)
                 {
                     Console.WriteLine("La respuesta del SRI es nula o no contiene la estructura esperada.");
-                    // Return a new instance to avoid returning null
                     return new SriRecepcion.validarComprobanteResponse();
                 }
                 else
@@ -105,10 +112,42 @@ namespace Infrastructure.Facturacion.Services
             }
         }
 
-        public async Task<SriAutorizacion.autorizacionComprobanteResponse> ConsultarAutorizacion(string claveAcceso)
+        public async Task<RespuestaAutorizacion> ConsultarAutorizacion(string claveAcceso)
         {
+            // Limpiar el almacenamiento antes de la llamada
+            MessageInspectorStorage.LastResponseXml = null;
+
             var request = new SriAutorizacion.autorizacionComprobante(claveAcceso);
-            return await _autorizacionClient.autorizacionComprobanteAsync(request);
+            var respuesta = await _autorizacionClient.autorizacionComprobanteAsync(request);
+
+            string xmlSerializado = null;
+            try
+            {
+                var serializer = new XmlSerializer(typeof(SriAutorizacion.autorizacionComprobanteResponse));
+                using (var sw = new StringWriter())
+                {
+                    serializer.Serialize(sw, respuesta);
+                    xmlSerializado = sw.ToString();
+                }
+                Console.WriteLine("=== XML DE RESPUESTA SERIALIZADO ===");
+                Console.WriteLine(xmlSerializado);
+                Console.WriteLine("=====================================");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al serializar respuesta de autorización: {ex.Message}");
+            }
+
+            // Obtener el XML crudo guardado por el inspector
+            string xmlCrudo = MessageInspectorStorage.LastResponseXml;
+            MessageInspectorStorage.LastResponseXml = null; // limpiar
+
+            return new RespuestaAutorizacion
+            {
+                RespuestaDeserializada = respuesta,
+                XmlRespuestaSerializada = xmlSerializado,
+                XmlRespuestaCruda = xmlCrudo
+            };
         }
     }
 }

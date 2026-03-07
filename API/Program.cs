@@ -21,6 +21,8 @@ using System.Security.Claims;
 using System.Text;
 using Yamgooo.SRI.Sign;
 using Yamgooo.SRI.Sign.Extensions;
+using Infrastructure.Facturacion.Services;
+using System.Xml.Linq;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -1140,36 +1142,42 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
     try
     {
         logger.LogInformation($"Consultando autorización para clave: {claveAcceso}");
-        var response = await sriService.ConsultarAutorizacion(claveAcceso);
+        var respuesta = await sriService.ConsultarAutorizacion(claveAcceso);
 
-        if (response?.RespuestaAutorizacionComprobante?.autorizaciones?.Length > 0)
+        // Intentar obtener autorización desde el objeto deserializado
+        if (respuesta.RespuestaDeserializada?.RespuestaAutorizacionComprobante?.autorizaciones?.Length > 0)
         {
-            var autorizacion = response.RespuestaAutorizacionComprobante.autorizaciones[0];
+            var autorizacion = respuesta.RespuestaDeserializada.RespuestaAutorizacionComprobante.autorizaciones[0];
+            logger.LogInformation("Autorización encontrada por deserialización: Estado={Estado}, Numero={Numero}",
+                autorizacion.estado, autorizacion.numeroAutorizacion);
             return Results.Ok(new
             {
-                claveAcceso = claveAcceso,
+                claveAcceso,
                 estado = autorizacion.estado,
                 fechaAutorizacion = autorizacion.fechaAutorizacion,
                 numeroAutorizacion = autorizacion.numeroAutorizacion,
                 ambiente = autorizacion.ambiente,
-                comprobante = autorizacion.comprobante // XML autorizado
+                comprobante = autorizacion.comprobante
             });
         }
-        else
+
+        // Si no se pudo por deserialización, mostrar el XML crudo para depuración
+        logger.LogWarning("No se encontraron autorizaciones en la respuesta deserializada. XML recibido: {Xml}",
+            respuesta.XmlRespuestaCruda ?? "null");
+
+        return Results.Ok(new
         {
-            return Results.Ok(new
-            {
-                claveAcceso = claveAcceso,
-                estado = "NO PROCESADO AÚN",
-                mensaje = "El comprobante aún no ha sido procesado o no existe"
-            });
-        }
+            claveAcceso,
+            estado = "NO PROCESADO AÚN",
+            mensaje = "El comprobante aún no ha sido procesado o no existe",
+            xmlDepuracion = respuesta.XmlRespuestaCruda // opcional, útil para debug
+        });
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "Error al consultar autorización");
         return Results.Problem($"Error interno: {ex.Message}");
     }
-}).AllowAnonymous(); // Solo para pruebas, luego puedes quitar AllowAnonymous
+}).AllowAnonymous();
 
 app.Run();

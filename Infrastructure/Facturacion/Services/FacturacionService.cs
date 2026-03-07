@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using System.Xml.Serialization;
 using Infrastructure.Data;
 using Infrastructure.Facturacion.Helpers;
@@ -107,7 +108,6 @@ namespace Infrastructure.Facturacion.Services
                     fechaEmision = venta.FechaCompra?.ToString("dd/MM/yyyy") ?? "",
                     dirEstablecimiento = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
                     obligadoContabilidad = "NO",
-                    // Para evitar el error de consumidor final con monto > 50 USD, usamos un receptor de prueba
                     tipoIdentificacionComprador = "04", // RUC
                     razonSocialComprador = "PRUEBAS SERVICIO DE RENTAS INTERNAS",
                     identificacionComprador = "1790012347001", // RUC de prueba según ficha técnica
@@ -125,7 +125,7 @@ namespace Infrastructure.Facturacion.Services
                         }
                     },
                     propina = 0,
-                    importeTotal = venta.TotalCompra, // debe ser totalSinImpuestos + totalIva
+                    importeTotal = venta.TotalCompra,
                     moneda = "DOLAR",
                     pagos = new System.Collections.Generic.List<PagoFactura>
                     {
@@ -142,7 +142,7 @@ namespace Infrastructure.Facturacion.Services
                     CodigoAuxiliar = "", // vacío, no se serializará
                     descripcion = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Descripcion ?? "",
                     cantidad = 1,
-                    precioUnitario = Math.Round(vp.PrecioVenta - vp.Iva, 2), // precio sin IVA
+                    precioUnitario = Math.Round((vp.PrecioVenta - vp.Iva) + (vp.Descuento ?? 0), 2),
                     descuento = Math.Round(vp.Descuento ?? 0, 2),
                     precioTotalSinImpuesto = Math.Round(vp.PrecioVenta - vp.Iva, 2),
                     impuestos = new System.Collections.Generic.List<DetalleImpuesto>
@@ -167,7 +167,7 @@ namespace Infrastructure.Facturacion.Services
                 }
             };
 
-            // Generar clave de acceso (usa el mismo secuencial de 9 dígitos)
+            // Generar clave de acceso
             factura.InfoTributaria.claveAcceso = ClaveAccesoHelper.GenerarClaveAcceso(
                 venta.FechaCompra ?? throw new InvalidOperationException("Fecha de compra no puede ser nula"),
                 factura.InfoTributaria.ruc,
@@ -179,13 +179,13 @@ namespace Infrastructure.Facturacion.Services
             // Serializar a XML
             var xmlSinFirma = SerializarAFacturaXml(factura);
 
-            // 3. Firmar electrónicamente
+            // Firmar electrónicamente
             var xmlFirmado = await _firmaService.FirmarXmlAsync(xmlSinFirma);
 
             // Guardar XML firmado para inspección manual (opcional)
             File.WriteAllText("C:/temp/xmlFirmado.xml", xmlFirmado);
 
-            // 4. Enviar al SRI
+            // Enviar al SRI
             var bytesXml = Encoding.UTF8.GetBytes(xmlFirmado);
             SriRecepcion.validarComprobanteResponse respuestaRecepcion;
 
@@ -197,7 +197,7 @@ namespace Infrastructure.Facturacion.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al enviar comprobante al SRI");
-                venta.EstadoSri = "Rechazado"; // Usar estado permitido
+                venta.EstadoSri = "Rechazado";
                 await _context.SaveChangesAsync();
                 throw;
             }
@@ -206,33 +206,116 @@ namespace Infrastructure.Facturacion.Services
             {
                 try
                 {
-                    // Esperar y consultar autorización
                     await Task.Delay(3000);
                     var respuestaAutorizacion = await _sriService.ConsultarAutorizacion(factura.InfoTributaria.claveAcceso);
 
-                    if (respuestaAutorizacion?.RespuestaAutorizacionComprobante?.autorizaciones?.Length > 0)
+                    // --- Procesamiento con objeto deserializado ---
+                    bool autorizacionProcesada = false;
+                    if (respuestaAutorizacion.RespuestaDeserializada?.RespuestaAutorizacionComprobante != null)
                     {
-                        var autorizacion = respuestaAutorizacion.RespuestaAutorizacionComprobante.autorizaciones[0];
-                        venta.EstadoSri = autorizacion.estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
-                        venta.FechaAutorizacion = DateTime.Now;
+                        var comprobante = respuestaAutorizacion.RespuestaDeserializada.RespuestaAutorizacionComprobante;
+                        _logger.LogInformation("Respuesta deserializada: ClaveConsultada={Clave}, NumComprobantes={Num}, Autorizaciones.Length={Len}",
+                            comprobante.claveAccesoConsultada, comprobante.numeroComprobantes, comprobante.autorizaciones?.Length ?? 0);
 
-                        // Guardar XML autorizado
-                        var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                                   $"{factura.InfoTributaria.claveAcceso}.xml");
-                        Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                        await File.WriteAllTextAsync(rutaXml, xmlFirmado);
-                        venta.XmlPath = rutaXml;
+                        if (comprobante.autorizaciones != null && comprobante.autorizaciones.Length > 0)
+                        {
+                            var autorizacion = comprobante.autorizaciones[0];
+                            _logger.LogInformation("Autorización encontrada por deserialización: Estado={Estado}, Numero={Numero}",
+                                autorizacion.estado, autorizacion.numeroAutorizacion);
+
+                            venta.EstadoSri = autorizacion.estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
+                            venta.FechaAutorizacion = DateTime.Now;
+                            venta.ClaveAcceso = autorizacion.numeroAutorizacion;
+
+                            if (!string.IsNullOrEmpty(autorizacion.comprobante))
+                            {
+                                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                                           $"{factura.InfoTributaria.claveAcceso}.xml");
+                                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                                await File.WriteAllTextAsync(rutaXml, autorizacion.comprobante);
+                                venta.XmlPath = rutaXml;
+                                _logger.LogInformation("XML autorizado guardado en {Ruta}", rutaXml);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("El XML autorizado viene vacío, se guardará el firmado original.");
+                                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                                           $"{factura.InfoTributaria.claveAcceso}.xml");
+                                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                                await File.WriteAllTextAsync(rutaXml, xmlFirmado);
+                                venta.XmlPath = rutaXml;
+                            }
+                            autorizacionProcesada = true;
+                        }
                     }
-                    else
+
+                    // --- Si no se pudo por deserialización, intentar parseo manual del XML crudo ---
+                    if (!autorizacionProcesada)
                     {
-                        venta.EstadoSri = "Rechazado"; // No se recibieron autorizaciones
-                        _logger.LogWarning("No se recibieron autorizaciones para la clave {Clave}", factura.InfoTributaria.claveAcceso);
+                        _logger.LogWarning("No se pudo obtener autorización por deserialización. Intentando parseo manual del XML crudo.");
+
+                        string xmlParaParsear = respuestaAutorizacion.XmlRespuestaCruda;
+                        if (!string.IsNullOrEmpty(xmlParaParsear))
+                        {
+                            try
+                            {
+                                var doc = System.Xml.Linq.XDocument.Parse(xmlParaParsear);
+                                XNamespace ns = "http://ec.gob.sri.ws.autorizacion";
+                                var authElement = doc.Descendants(ns + "autorizacion").FirstOrDefault();
+
+                                if (authElement != null)
+                                {
+                                    var estado = (string)authElement.Element(ns + "estado");
+                                    var numero = (string)authElement.Element(ns + "numeroAutorizacion");
+                                    var fechaStr = (string)authElement.Element(ns + "fechaAutorizacion");
+                                    var comprobanteXml = (string)authElement.Element(ns + "comprobante");
+
+                                    _logger.LogInformation("Parseo manual exitoso: Estado={Estado}, Numero={Numero}", estado, numero);
+
+                                    venta.EstadoSri = estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
+                                    if (DateTime.TryParse(fechaStr, out var fecha))
+                                        venta.FechaAutorizacion = fecha;
+                                    else
+                                        venta.FechaAutorizacion = DateTime.Now;
+                                    venta.ClaveAcceso = numero;
+
+                                    if (!string.IsNullOrEmpty(comprobanteXml))
+                                    {
+                                        var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                                                   $"{factura.InfoTributaria.claveAcceso}.xml");
+                                        Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                                        await File.WriteAllTextAsync(rutaXml, comprobanteXml);
+                                        venta.XmlPath = rutaXml;
+                                        _logger.LogInformation("XML autorizado guardado en {Ruta} (parseo manual)", rutaXml);
+                                    }
+                                    autorizacionProcesada = true;
+                                }
+                                else
+                                {
+                                    _logger.LogError("No se encontró elemento <autorizacion> en el XML crudo.");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error al parsear manualmente el XML crudo de autorización.");
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogError("No se pudo obtener el XML crudo para parseo manual.");
+                        }
+                    }
+
+                    if (!autorizacionProcesada)
+                    {
+                        venta.EstadoSri = "Rechazado";
+                        _logger.LogWarning("No se pudo obtener ninguna autorización para la clave {Clave}", factura.InfoTributaria.claveAcceso);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error al consultar autorización para la clave {Clave}", factura.InfoTributaria.claveAcceso);
-                    venta.EstadoSri = "Rechazado"; // Error en consulta
+                    venta.EstadoSri = "Rechazado";
                 }
             }
             else
@@ -246,6 +329,7 @@ namespace Infrastructure.Facturacion.Services
             }
 
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Venta {VentaId} actualizada con estado {Estado}", ventaId, venta.EstadoSri);
         }
 
         private string SerializarAFacturaXml(Factura factura)
@@ -256,7 +340,6 @@ namespace Infrastructure.Facturacion.Services
             using var stringWriter = new StringWriter();
             serializer.Serialize(stringWriter, factura, ns);
             var xml = stringWriter.ToString();
-            // Reemplazar la declaración de encoding de utf-16 a utf-8
             return xml.Replace("<?xml version=\"1.0\" encoding=\"utf-16\"?>", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         }
     }
