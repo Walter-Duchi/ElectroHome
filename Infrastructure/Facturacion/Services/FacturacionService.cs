@@ -16,6 +16,7 @@ using SriRecepcion;
 using SriAutorizacion;
 using PagoModel = Infrastructure.Models.Pago;
 using PagoFactura = Infrastructure.Facturacion.Models.Pago;
+using Infrastructure.WcfInspectors; // Añadido para acceder a MessageInspectorStorage
 
 namespace Infrastructure.Facturacion.Services
 {
@@ -202,6 +203,56 @@ namespace Infrastructure.Facturacion.Services
                 throw;
             }
 
+            // Capturar el XML crudo de la respuesta de recepción (guardado por el inspector)
+            string rawRecepcionXml = MessageInspectorStorage.LastResponseXml;
+            // Limpiar el almacenamiento para no interferir con futuras llamadas
+            MessageInspectorStorage.LastResponseXml = null;
+
+            // --- Procesar respuesta de recepción ---
+            // Primero, verificar manualmente si existe el error 45 (ERROR SECUENCIAL REGISTRADO)
+            bool esErrorSecuencialRegistrado = false;
+            if (!string.IsNullOrEmpty(rawRecepcionXml))
+            {
+                try
+                {
+                    var doc = XDocument.Parse(rawRecepcionXml);
+                    // Buscar cualquier elemento <mensaje> que contenga <identificador>45</identificador>
+                    var mensajes = doc.Descendants().Where(x => x.Name.LocalName == "mensaje");
+                    foreach (var msg in mensajes)
+                    {
+                        var identificador = msg.Element(XName.Get("identificador"))?.Value;
+                        if (identificador == "45")
+                        {
+                            esErrorSecuencialRegistrado = true;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al parsear XML crudo de recepción para detectar error 45.");
+                }
+            }
+
+            if (esErrorSecuencialRegistrado)
+            {
+                _logger.LogWarning("Detectado ERROR SECUENCIAL REGISTRADO (identificador 45) en la respuesta de recepción para la venta {VentaId}. La venta ya fue facturada previamente.", ventaId);
+
+                // Verificar el estado actual en base de datos
+                if (venta.EstadoSri == "Rechazado")
+                {
+                    // Inconsistencia: la BD dice rechazado pero el SRI indica que ya fue registrada (debería estar autorizada)
+                    _logger.LogWarning("Corrigiendo inconsistencia: venta {VentaId} estaba en estado Rechazado, se actualiza a Autorizado.", ventaId);
+                    venta.EstadoSri = "Autorizado";
+                    await _context.SaveChangesAsync();
+                }
+                // Si ya está Autorizado, no hacer nada (no se modifica la BD)
+
+                // Lanzar excepción con mensaje claro para que la API lo devuelva
+                throw new Exception($"La venta {ventaId} ya fue facturada y autorizada previamente. No se puede facturar nuevamente.");
+            }
+
+            // Si no es error 45, continuar con el flujo normal
             if (respuestaRecepcion?.RespuestaRecepcionComprobante?.estado == "RECIBIDA")
             {
                 try
@@ -249,7 +300,7 @@ namespace Infrastructure.Facturacion.Services
                         }
                     }
 
-                    // --- Si no se pudo por deserialización, intentar parseo manual del XML crudo ---
+                    // --- Si no se pudo por deserialización, intentar parseo manual del XML crudo (ignorando namespaces) ---
                     if (!autorizacionProcesada)
                     {
                         _logger.LogWarning("No se pudo obtener autorización por deserialización. Intentando parseo manual del XML crudo.");
@@ -260,15 +311,15 @@ namespace Infrastructure.Facturacion.Services
                             try
                             {
                                 var doc = System.Xml.Linq.XDocument.Parse(xmlParaParsear);
-                                XNamespace ns = "http://ec.gob.sri.ws.autorizacion";
-                                var authElement = doc.Descendants(ns + "autorizacion").FirstOrDefault();
+                                // Buscar elemento <autorizacion> por nombre local (sin namespace)
+                                var authElement = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "autorizacion");
 
                                 if (authElement != null)
                                 {
-                                    var estado = (string)authElement.Element(ns + "estado");
-                                    var numero = (string)authElement.Element(ns + "numeroAutorizacion");
-                                    var fechaStr = (string)authElement.Element(ns + "fechaAutorizacion");
-                                    var comprobanteXml = (string)authElement.Element(ns + "comprobante");
+                                    var estado = (string)authElement.Element(XName.Get("estado"));
+                                    var numero = (string)authElement.Element(XName.Get("numeroAutorizacion"));
+                                    var fechaStr = (string)authElement.Element(XName.Get("fechaAutorizacion"));
+                                    var comprobanteXml = (string)authElement.Element(XName.Get("comprobante"));
 
                                     _logger.LogInformation("Parseo manual exitoso: Estado={Estado}, Numero={Numero}", estado, numero);
 
@@ -318,13 +369,19 @@ namespace Infrastructure.Facturacion.Services
                     venta.EstadoSri = "Rechazado";
                 }
             }
-            else
+            else // estado != RECIBIDA (por ejemplo DEVUELTA)
             {
                 venta.EstadoSri = "Rechazado";
                 if (respuestaRecepcion?.RespuestaRecepcionComprobante?.comprobantes?.Length > 0)
                 {
                     var errores = respuestaRecepcion.RespuestaRecepcionComprobante.comprobantes[0].mensajes;
                     _logger.LogError("Errores en recepción: {@errores}", errores);
+
+                    // Verificar si es error por duplicado (identificador 45) - aunque ya lo detectamos arriba, por si acaso
+                    if (errores != null && errores.Any(m => m.identificador == "45"))
+                    {
+                        throw new Exception("La venta ya ha sido facturada previamente.");
+                    }
                 }
             }
 

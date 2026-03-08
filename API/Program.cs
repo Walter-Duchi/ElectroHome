@@ -1161,10 +1161,48 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
             });
         }
 
-        // Si no se pudo por deserialización, mostrar el XML crudo para depuración
-        logger.LogWarning("No se encontraron autorizaciones en la respuesta deserializada. XML recibido: {Xml}",
-            respuesta.XmlRespuestaCruda ?? "null");
+        // Si no se pudo por deserialización, intentar parseo manual del XML crudo
+        string xmlParaParsear = respuesta.XmlRespuestaCruda;
+        if (!string.IsNullOrEmpty(xmlParaParsear))
+        {
+            try
+            {
+                var doc = XDocument.Parse(xmlParaParsear);
+                // Buscar elemento <autorizacion> por nombre local (sin namespace)
+                var authElement = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "autorizacion");
 
+                if (authElement != null)
+                {
+                    var estado = (string)authElement.Element(XName.Get("estado"));
+                    var numero = (string)authElement.Element(XName.Get("numeroAutorizacion"));
+                    var fechaStr = (string)authElement.Element(XName.Get("fechaAutorizacion"));
+                    var ambiente = (string)authElement.Element(XName.Get("ambiente"));
+                    var comprobanteXml = (string)authElement.Element(XName.Get("comprobante"));
+
+                    logger.LogInformation("Autorización encontrada por parseo manual: Estado={Estado}, Numero={Numero}", estado, numero);
+                    return Results.Ok(new
+                    {
+                        claveAcceso,
+                        estado,
+                        fechaAutorizacion = fechaStr,
+                        numeroAutorizacion = numero,
+                        ambiente,
+                        comprobante = comprobanteXml
+                    });
+                }
+                else
+                {
+                    logger.LogWarning("No se encontró elemento <autorizacion> en el XML crudo.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error al parsear manualmente el XML crudo de autorización.");
+            }
+        }
+
+        // Si aún no se encontró, devolver mensaje por defecto
+        logger.LogWarning("No se encontraron autorizaciones en la respuesta deserializada ni en parseo manual.");
         return Results.Ok(new
         {
             claveAcceso,
@@ -1179,5 +1217,6 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
         return Results.Problem($"Error interno: {ex.Message}");
     }
 }).AllowAnonymous();
+
 
 app.Run();
