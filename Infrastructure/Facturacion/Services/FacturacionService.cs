@@ -16,7 +16,7 @@ using SriRecepcion;
 using SriAutorizacion;
 using PagoModel = Infrastructure.Models.Pago;
 using PagoFactura = Infrastructure.Facturacion.Models.Pago;
-using Infrastructure.WcfInspectors; // Añadido para acceder a MessageInspectorStorage
+using Infrastructure.WcfInspectors;
 
 namespace Infrastructure.Facturacion.Services
 {
@@ -32,6 +32,8 @@ namespace Infrastructure.Facturacion.Services
         private readonly ISriFacturacionService _sriService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<FacturacionService> _logger;
+        private const int MAX_INTENTOS_POST = 3;
+        private const int ESPERA_ENTRE_INTENTOS_MS = 3000;
 
         public FacturacionService(
             ReclamosContext context,
@@ -47,8 +49,17 @@ namespace Infrastructure.Facturacion.Services
             _logger = logger;
         }
 
+        // Método público que implementa la interfaz
         public async Task FacturarVenta(int ventaId)
         {
+            await FacturarVentaConReintento(ventaId, 1);
+        }
+
+        // Método privado que maneja los reintentos
+        private async Task FacturarVentaConReintento(int ventaId, int intento)
+        {
+            _logger.LogInformation("=== INTENTO {Intento} de facturación para venta {VentaId} ===", intento, ventaId);
+
             // 1. Obtener datos de la venta, cliente y productos
             var venta = await _context.Ventas
                 .Include(v => v.FkEmpresaClienteNavigation)
@@ -205,18 +216,16 @@ namespace Infrastructure.Facturacion.Services
 
             // Capturar el XML crudo de la respuesta de recepción (guardado por el inspector)
             string rawRecepcionXml = MessageInspectorStorage.LastResponseXml;
-            // Limpiar el almacenamiento para no interferir con futuras llamadas
-            MessageInspectorStorage.LastResponseXml = null;
+            MessageInspectorStorage.LastResponseXml = null; // limpiar
 
             // --- Procesar respuesta de recepción ---
-            // Primero, verificar manualmente si existe el error 45 (ERROR SECUENCIAL REGISTRADO)
             bool esErrorSecuencialRegistrado = false;
+            bool esClaveEnProcesamiento = false;
             if (!string.IsNullOrEmpty(rawRecepcionXml))
             {
                 try
                 {
                     var doc = XDocument.Parse(rawRecepcionXml);
-                    // Buscar cualquier elemento <mensaje> que contenga <identificador>45</identificador>
                     var mensajes = doc.Descendants().Where(x => x.Name.LocalName == "mensaje");
                     foreach (var msg in mensajes)
                     {
@@ -226,33 +235,56 @@ namespace Infrastructure.Facturacion.Services
                             esErrorSecuencialRegistrado = true;
                             break;
                         }
+                        if (identificador == "70")
+                        {
+                            esClaveEnProcesamiento = true;
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error al parsear XML crudo de recepción para detectar error 45.");
+                    _logger.LogError(ex, "Error al parsear XML crudo de recepción.");
                 }
             }
 
+            // Caso 1: Error secuencial registrado (ya facturado)
             if (esErrorSecuencialRegistrado)
             {
                 _logger.LogWarning("Detectado ERROR SECUENCIAL REGISTRADO (identificador 45) en la respuesta de recepción para la venta {VentaId}. La venta ya fue facturada previamente.", ventaId);
 
-                // Verificar el estado actual en base de datos
                 if (venta.EstadoSri == "Rechazado")
                 {
-                    // Inconsistencia: la BD dice rechazado pero el SRI indica que ya fue registrada (debería estar autorizada)
                     _logger.LogWarning("Corrigiendo inconsistencia: venta {VentaId} estaba en estado Rechazado, se actualiza a Autorizado.", ventaId);
                     venta.EstadoSri = "Autorizado";
                     await _context.SaveChangesAsync();
                 }
-                // Si ya está Autorizado, no hacer nada (no se modifica la BD)
 
-                // Lanzar excepción con mensaje claro para que la API lo devuelva
                 throw new Exception($"La venta {ventaId} ya fue facturada y autorizada previamente. No se puede facturar nuevamente.");
             }
 
-            // Si no es error 45, continuar con el flujo normal
+            // Caso 2: Clave en procesamiento (identificador 70) - reintentar el envío (POST)
+            if (esClaveEnProcesamiento)
+            {
+                _logger.LogInformation("Detectado CLAVE DE ACCESO EN PROCESAMIENTO (identificador 70) para la venta {VentaId}. Intento {Intento} de {MaxIntentos}.", ventaId, intento, MAX_INTENTOS_POST);
+
+                if (intento < MAX_INTENTOS_POST)
+                {
+                    _logger.LogInformation("Esperando {Espera} ms antes de reintentar el envío...", ESPERA_ENTRE_INTENTOS_MS);
+                    await Task.Delay(ESPERA_ENTRE_INTENTOS_MS);
+                    // Reintentar el proceso completo (no se ha guardado nada en base de datos todavía)
+                    await FacturarVentaConReintento(ventaId, intento + 1);
+                    return; // Importante: salir para no continuar con el flujo actual
+                }
+                else
+                {
+                    _logger.LogError("Se alcanzó el máximo de reintentos ({MaxIntentos}) para la venta {VentaId}. La venta quedará en estado Rechazado.", MAX_INTENTOS_POST, ventaId);
+                    venta.EstadoSri = "Rechazado";
+                    await _context.SaveChangesAsync();
+                    throw new Exception("El comprobante fue recibido pero no se pudo obtener la autorización después de varios intentos de envío. Por favor, consulte manualmente.");
+                }
+            }
+
+            // Si no es error 45 ni 70, continuar con el flujo normal (cuando la respuesta es RECIBIDA)
             if (respuestaRecepcion?.RespuestaRecepcionComprobante?.estado == "RECIBIDA")
             {
                 try
@@ -274,33 +306,12 @@ namespace Infrastructure.Facturacion.Services
                             _logger.LogInformation("Autorización encontrada por deserialización: Estado={Estado}, Numero={Numero}",
                                 autorizacion.estado, autorizacion.numeroAutorizacion);
 
-                            venta.EstadoSri = autorizacion.estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
-                            venta.FechaAutorizacion = DateTime.Now;
-                            venta.ClaveAcceso = autorizacion.numeroAutorizacion;
-
-                            if (!string.IsNullOrEmpty(autorizacion.comprobante))
-                            {
-                                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                                           $"{factura.InfoTributaria.claveAcceso}.xml");
-                                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                                await File.WriteAllTextAsync(rutaXml, autorizacion.comprobante);
-                                venta.XmlPath = rutaXml;
-                                _logger.LogInformation("XML autorizado guardado en {Ruta}", rutaXml);
-                            }
-                            else
-                            {
-                                _logger.LogWarning("El XML autorizado viene vacío, se guardará el firmado original.");
-                                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                                           $"{factura.InfoTributaria.claveAcceso}.xml");
-                                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                                await File.WriteAllTextAsync(rutaXml, xmlFirmado);
-                                venta.XmlPath = rutaXml;
-                            }
+                            await ProcesarAutorizacion(venta, autorizacion, xmlFirmado, factura.InfoTributaria.claveAcceso);
                             autorizacionProcesada = true;
                         }
                     }
 
-                    // --- Si no se pudo por deserialización, intentar parseo manual del XML crudo (ignorando namespaces) ---
+                    // --- Si no se pudo por deserialización, intentar parseo manual del XML crudo ---
                     if (!autorizacionProcesada)
                     {
                         _logger.LogWarning("No se pudo obtener autorización por deserialización. Intentando parseo manual del XML crudo.");
@@ -310,8 +321,7 @@ namespace Infrastructure.Facturacion.Services
                         {
                             try
                             {
-                                var doc = System.Xml.Linq.XDocument.Parse(xmlParaParsear);
-                                // Buscar elemento <autorizacion> por nombre local (sin namespace)
+                                var doc = XDocument.Parse(xmlParaParsear);
                                 var authElement = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "autorizacion");
 
                                 if (authElement != null)
@@ -323,22 +333,7 @@ namespace Infrastructure.Facturacion.Services
 
                                     _logger.LogInformation("Parseo manual exitoso: Estado={Estado}, Numero={Numero}", estado, numero);
 
-                                    venta.EstadoSri = estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
-                                    if (DateTime.TryParse(fechaStr, out var fecha))
-                                        venta.FechaAutorizacion = fecha;
-                                    else
-                                        venta.FechaAutorizacion = DateTime.Now;
-                                    venta.ClaveAcceso = numero;
-
-                                    if (!string.IsNullOrEmpty(comprobanteXml))
-                                    {
-                                        var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                                                   $"{factura.InfoTributaria.claveAcceso}.xml");
-                                        Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                                        await File.WriteAllTextAsync(rutaXml, comprobanteXml);
-                                        venta.XmlPath = rutaXml;
-                                        _logger.LogInformation("XML autorizado guardado en {Ruta} (parseo manual)", rutaXml);
-                                    }
+                                    await ProcesarAutorizacionManual(venta, estado, numero, fechaStr, comprobanteXml, xmlFirmado, factura.InfoTributaria.claveAcceso);
                                     autorizacionProcesada = true;
                                 }
                                 else
@@ -369,24 +364,75 @@ namespace Infrastructure.Facturacion.Services
                     venta.EstadoSri = "Rechazado";
                 }
             }
-            else // estado != RECIBIDA (por ejemplo DEVUELTA)
+            else // estado != RECIBIDA (por ejemplo DEVUELTA con otro error)
             {
                 venta.EstadoSri = "Rechazado";
                 if (respuestaRecepcion?.RespuestaRecepcionComprobante?.comprobantes?.Length > 0)
                 {
                     var errores = respuestaRecepcion.RespuestaRecepcionComprobante.comprobantes[0].mensajes;
                     _logger.LogError("Errores en recepción: {@errores}", errores);
-
-                    // Verificar si es error por duplicado (identificador 45) - aunque ya lo detectamos arriba, por si acaso
-                    if (errores != null && errores.Any(m => m.identificador == "45"))
-                    {
-                        throw new Exception("La venta ya ha sido facturada previamente.");
-                    }
                 }
             }
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Venta {VentaId} actualizada con estado {Estado}", ventaId, venta.EstadoSri);
+        }
+
+        // Método auxiliar para procesar autorización obtenida por deserialización
+        private async Task ProcesarAutorizacion(Venta venta, SriAutorizacion.autorizacion autorizacion, string xmlFirmado, string claveAccesoGenerada)
+        {
+            venta.EstadoSri = autorizacion.estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
+            venta.FechaAutorizacion = DateTime.Now;
+            venta.ClaveAcceso = autorizacion.numeroAutorizacion;
+
+            if (!string.IsNullOrEmpty(autorizacion.comprobante))
+            {
+                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                           $"{claveAccesoGenerada}.xml");
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                await File.WriteAllTextAsync(rutaXml, autorizacion.comprobante);
+                venta.XmlPath = rutaXml;
+                _logger.LogInformation("XML autorizado guardado en {Ruta}", rutaXml);
+            }
+            else
+            {
+                _logger.LogWarning("El XML autorizado viene vacío, se guardará el firmado original.");
+                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                           $"{claveAccesoGenerada}.xml");
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                await File.WriteAllTextAsync(rutaXml, xmlFirmado);
+                venta.XmlPath = rutaXml;
+            }
+        }
+
+        // Método auxiliar para procesar autorización obtenida por parseo manual
+        private async Task ProcesarAutorizacionManual(Venta venta, string estado, string numero, string fechaStr, string comprobanteXml, string xmlFirmado, string claveAccesoGenerada)
+        {
+            venta.EstadoSri = estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
+            if (DateTime.TryParse(fechaStr, out var fecha))
+                venta.FechaAutorizacion = fecha;
+            else
+                venta.FechaAutorizacion = DateTime.Now;
+            venta.ClaveAcceso = numero;
+
+            if (!string.IsNullOrEmpty(comprobanteXml))
+            {
+                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                           $"{claveAccesoGenerada}.xml");
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                await File.WriteAllTextAsync(rutaXml, comprobanteXml);
+                venta.XmlPath = rutaXml;
+                _logger.LogInformation("XML autorizado guardado en {Ruta} (parseo manual)", rutaXml);
+            }
+            else
+            {
+                _logger.LogWarning("El XML autorizado (manual) viene vacío, se guardará el firmado original.");
+                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
+                                           $"{claveAccesoGenerada}.xml");
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
+                await File.WriteAllTextAsync(rutaXml, xmlFirmado);
+                venta.XmlPath = rutaXml;
+            }
         }
 
         private string SerializarAFacturaXml(Factura factura)
