@@ -8,21 +8,25 @@ using Application.DTOs.Reclamos.Tecnico;
 using Application.DTOs.Reclamos.User;
 using Infrastructure.Data;
 using Infrastructure.Facturacion.Services;
+using Infrastructure.Facturacion.Services;
+using Infrastructure.Payphone.DTOs;
+using Infrastructure.Payphone.Services;
 using Infrastructure.Reclamos.Interfaces;
 using Infrastructure.Reclamos.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using QuestPDF.Infrastructure;
+using System.Net.Http;
 using System.Security.Claims;
 using System.Text;
+using System.Xml.Linq;
 using Yamgooo.SRI.Sign;
 using Yamgooo.SRI.Sign.Extensions;
-using Infrastructure.Facturacion.Services;
-using System.Xml.Linq;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -109,7 +113,9 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IFirmaElectronicaService, FirmaElectronicaService>();
 builder.Services.AddScoped<ISriFacturacionService, SriFacturacionService>();
 builder.Services.AddScoped<IFacturacionService, FacturacionService>();
+builder.Services.AddScoped<IPayphoneService, PayphoneService>();
 builder.Services.AddSriSignService(builder.Configuration, "SriSign");
+builder.Services.AddHttpClient();
 
 
 builder.Services.AddCors(options =>
@@ -1217,6 +1223,60 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
         return Results.Problem($"Error interno: {ex.Message}");
     }
 }).AllowAnonymous();
+
+// ============================================
+// ENDPOINTS DE PAYPHONE (PASARELA DE PAGO)
+// ============================================
+
+// Inicializar transacción (requiere autenticación)
+app.MapPost("/api/payphone/init", [Authorize] async (HttpContext httpContext, IPayphoneService payphoneService) =>
+{
+    try
+    {
+        var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var response = await payphoneService.InitializeTransactionAsync(usuarioId);
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// Confirmar transacción (requiere autenticación)
+app.MapPost("/api/payphone/confirm", [Authorize] async (PayphoneConfirmRequest request, HttpContext httpContext, IPayphoneService payphoneService) =>
+{
+    try
+    {
+        var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var response = await payphoneService.ConfirmTransactionAsync(request, usuarioId);
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// Endpoint para descargar PDF de factura
+app.MapGet("/api/facturacion/pdf/{ventaId:int}", [Authorize] async (int ventaId, HttpContext httpContext, ReclamosContext context, IConfiguration config) =>
+{
+    var venta = await context.Ventas.FindAsync(ventaId);
+    if (venta == null)
+        return Results.NotFound();
+
+    // Verificar que el usuario es el comprador o tiene permisos
+    // (por simplicidad, solo verificamos que el usuario autenticado es el cliente)
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    if (venta.FkEmpresaCliente != usuarioId)
+        return Results.Forbid();
+
+    if (string.IsNullOrEmpty(venta.PdfPath) || !File.Exists(venta.PdfPath))
+        return Results.NotFound("Factura PDF no disponible");
+
+    var bytes = await File.ReadAllBytesAsync(venta.PdfPath);
+    return Results.File(bytes, "application/pdf", $"factura_{venta.CodigoFactura}.pdf");
+});
 
 
 app.Run();

@@ -15,7 +15,8 @@ import DatosEmpresaConfig from '../components/Admin/DatosEmpresaConfig';
 import EcommerceHome from '../components/Ecommerce/EcommerceHome';
 import Cart from '../components/Ecommerce/Cart';
 import ProductDetail from '../components/Ecommerce/ProductDetail';
-
+import Checkout from '../components/Payphone/Checkout';
+import PayphoneResponse from '../components/Payphone/PayphoneResponse';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -119,6 +120,17 @@ const AppContent: React.FC = () => {
 
         {/* Ruta por defecto */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
+        <Route path="/checkout" element={
+          <ProtectedRoute>
+            <Checkout />
+          </ProtectedRoute>
+        } />
+        <Route path="/payphone-response" element={
+          <ProtectedRoute>
+            <PayphoneResponse />
+          </ProtectedRoute>
+        } />
       </Routes>
     </Router>
   );

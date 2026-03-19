@@ -1,4 +1,7 @@
-﻿namespace Infrastructure.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace Infrastructure.Models;
 
 public partial class Usuario
 {
@@ -59,6 +62,8 @@ public partial class Usuario
     public virtual ICollection<InventarioMovimiento> InventarioMovimientos { get; set; } = new List<InventarioMovimiento>();
 
     public virtual ICollection<Usuario> InverseCreadoPorNavigation { get; set; } = new List<Usuario>();
+
+    public virtual ICollection<PayphoneTransaction> PayphoneTransactions { get; set; } = new List<PayphoneTransaction>();
 
     public virtual ICollection<Producto> ProductoCreadoPorNavigations { get; set; } = new List<Producto>();
 

@@ -202,9 +202,13 @@ const Cart: React.FC = () => {
               <Typography variant="h5" gutterBottom>
                 Total: ${total.toFixed(2)}
               </Typography>
-              <Button variant="contained" size="large" disabled>
-                Proceder al pago (próximamente)
-              </Button>
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={() => navigate('/checkout')}
+                >-
+                  Proceder al pago
+                </Button>
             </Box>
           </Box>
         </>

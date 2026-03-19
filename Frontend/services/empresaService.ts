@@ -1,5 +1,5 @@
 import api from './api';
-import { DatosEmpresa, UpdateDatosEmpresaRequest } from '../src/types/empresa';
+import type { DatosEmpresa, UpdateDatosEmpresaRequest } from '../src/types/empresa';
 
 export const empresaService = {
     async obtenerDatosEmpresa(): Promise<DatosEmpresa> {

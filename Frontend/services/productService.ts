@@ -1,5 +1,5 @@
 import api from './api';
-import { Product, ProductFilter } from '../src/types/ecommerce';
+import type { Product, ProductFilter } from '../src/types/ecommerce';
 
 export const productService = {
     async getProducts(filter: ProductFilter = {}): Promise<Product[]> {

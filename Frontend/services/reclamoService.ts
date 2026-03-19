@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import api from './api';
-import {
+import type{
     ValidarClienteRequest,
     ValidarClienteResponse,
     ValidarProductoRequest,

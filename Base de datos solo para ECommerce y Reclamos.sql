@@ -913,3 +913,17 @@ VALUES
 (3, 12, 1, '2024-01-30 11:15:00'),
 (3, 19, 1, '2024-01-30 11:20:00');
 GO
+
+CREATE TABLE PayphoneTransactions (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    ClientTransactionId VARCHAR(15) NOT NULL UNIQUE,
+    FkUsuario INT NOT NULL,
+    MontoTotal DECIMAL(12,2) NOT NULL,
+    Estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente' CHECK (Estado IN ('Pendiente', 'Completado', 'Fallido')),
+    FechaCreacion DATETIME NOT NULL DEFAULT GETDATE(),
+    DatosCarrito NVARCHAR(MAX) NOT NULL,
+    PayphoneId BIGINT NULL,
+    VentaId INT NULL,
+    CONSTRAINT FK_PayphoneTransactions_Usuario FOREIGN KEY (FkUsuario) REFERENCES Usuarios(Id),
+    CONSTRAINT FK_PayphoneTransactions_Venta FOREIGN KEY (VentaId) REFERENCES Ventas(Id)
+);
