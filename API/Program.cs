@@ -1,6 +1,8 @@
 using Application.DTOs.Admin;
 using Application.DTOs.Auth;
 using Application.DTOs.Ecommerce;
+using Application.DTOs.Inventario;
+using Application.DTOs.Productos;
 using Application.DTOs.Reclamos.Cliente;
 using Application.DTOs.Reclamos.Entrega;
 using Application.DTOs.Reclamos.Reclamo;
@@ -114,6 +116,8 @@ builder.Services.AddScoped<IFirmaElectronicaService, FirmaElectronicaService>();
 builder.Services.AddScoped<ISriFacturacionService, SriFacturacionService>();
 builder.Services.AddScoped<IFacturacionService, FacturacionService>();
 builder.Services.AddScoped<IPayphoneService, PayphoneService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
 builder.Services.AddSriSignService(builder.Configuration, "SriSign");
 builder.Services.AddHttpClient();
 
@@ -1278,5 +1282,397 @@ app.MapGet("/api/facturacion/pdf/{ventaId:int}", [Authorize] async (int ventaId,
     return Results.File(bytes, "application/pdf", $"factura_{venta.CodigoFactura}.pdf");
 });
 
+// ============================================
+// ENDPOINTS PARA ENCARGADO DE INVENTARIO
+// ============================================
+
+// Ubicaciones
+app.MapGet("/api/inventario/ubicaciones", [Authorize(Roles = "Encargado_Inventario")] async (IInventoryService service) =>
+{
+    var ubicaciones = await service.GetAllUbicacionesAsync();
+    return Results.Ok(ubicaciones);
+});
+
+app.MapGet("/api/inventario/ubicaciones/{id:int}", [Authorize(Roles = "Encargado_Inventario")] async (int id, IInventoryService service) =>
+{
+    var ubicacion = await service.GetUbicacionByIdAsync(id);
+    return ubicacion is not null ? Results.Ok(ubicacion) : Results.NotFound();
+});
+
+app.MapPost("/api/inventario/ubicaciones", [Authorize(Roles = "Encargado_Inventario")] async (CreateUbicacionRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var ubicacion = await service.CreateUbicacionAsync(request, usuarioId);
+        return Results.Created($"/api/inventario/ubicaciones/{ubicacion.Id}", ubicacion);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPut("/api/inventario/ubicaciones", [Authorize(Roles = "Encargado_Inventario")] async (UpdateUbicacionRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var ubicacion = await service.UpdateUbicacionAsync(request, usuarioId);
+        return Results.Ok(ubicacion);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapDelete("/api/inventario/ubicaciones/{id:int}", [Authorize(Roles = "Encargado_Inventario")] async (int id, IInventoryService service) =>
+{
+    try
+    {
+        var result = await service.DeleteUbicacionAsync(id);
+        return result ? Results.Ok() : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+// Movimientos
+app.MapGet("/api/inventario/movimientos", [Authorize(Roles = "Encargado_Inventario")] async (int? productoId, DateTime? desde, DateTime? hasta, IInventoryService service) =>
+{
+    var movimientos = await service.GetMovimientosAsync(productoId, desde, hasta);
+    return Results.Ok(movimientos);
+});
+
+app.MapPost("/api/inventario/entrada", [Authorize(Roles = "Encargado_Inventario")] async (CreateMovimientoRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var movimiento = await service.RegistrarEntradaAsync(request, usuarioId);
+        return Results.Ok(movimiento);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPost("/api/inventario/salida", [Authorize(Roles = "Encargado_Inventario")] async (CreateMovimientoRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var movimiento = await service.RegistrarSalidaAsync(request, usuarioId);
+        return Results.Ok(movimiento);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPost("/api/inventario/ajuste", [Authorize(Roles = "Encargado_Inventario")] async (CreateMovimientoRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var movimiento = await service.RegistrarAjusteAsync(request, usuarioId);
+        return Results.Ok(movimiento);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPost("/api/inventario/devolucion", [Authorize(Roles = "Encargado_Inventario")] async (CreateMovimientoRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var movimiento = await service.RegistrarDevolucionAsync(request, usuarioId);
+        return Results.Ok(movimiento);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+// Números de serie
+app.MapGet("/api/inventario/numeros-serie", [Authorize(Roles = "Encargado_Inventario")] async (int? productoId, string? estado, int? ubicacionId, IInventoryService service) =>
+{
+    var numeros = await service.GetNumerosSerieAsync(productoId, estado, ubicacionId);
+    return Results.Ok(numeros);
+});
+
+app.MapGet("/api/inventario/numeros-serie/{numero}", [Authorize(Roles = "Encargado_Inventario")] async (string numero, IInventoryService service) =>
+{
+    var ns = await service.GetNumeroSerieByNumeroAsync(numero);
+    return ns is not null ? Results.Ok(ns) : Results.NotFound();
+});
+
+app.MapPut("/api/inventario/numeros-serie", [Authorize(Roles = "Encargado_Inventario")] async (UpdateNumeroSerieRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var result = await service.UpdateNumeroSerieAsync(request, usuarioId);
+    return result ? Results.Ok() : Results.NotFound();
+});
+
+// Proveedores
+app.MapGet("/api/inventario/proveedores", [Authorize(Roles = "Encargado_Inventario")] async (bool soloActivos, IInventoryService service) =>
+{
+    var proveedores = await service.GetAllProveedoresAsync(soloActivos);
+    return Results.Ok(proveedores);
+});
+
+app.MapGet("/api/inventario/proveedores/{id:int}", [Authorize(Roles = "Encargado_Inventario")] async (int id, IInventoryService service) =>
+{
+    var proveedor = await service.GetProveedorByIdAsync(id);
+    return proveedor is not null ? Results.Ok(proveedor) : Results.NotFound();
+});
+
+app.MapPost("/api/inventario/proveedores", [Authorize(Roles = "Encargado_Inventario")] async (CreateProveedorRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var proveedor = await service.CreateProveedorAsync(request, usuarioId);
+        return Results.Created($"/api/inventario/proveedores/{proveedor.Id}", proveedor);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPut("/api/inventario/proveedores", [Authorize(Roles = "Encargado_Inventario")] async (UpdateProveedorRequest request, IInventoryService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var proveedor = await service.UpdateProveedorAsync(request, usuarioId);
+        return Results.Ok(proveedor);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPatch("/api/inventario/proveedores/{id:int}/toggle", [Authorize(Roles = "Encargado_Inventario")] async (int id, bool activo, IInventoryService service) =>
+{
+    var result = await service.ToggleProveedorActivoAsync(id, activo);
+    return result ? Results.Ok() : Results.NotFound();
+});
+
+// ============================================
+// ENDPOINTS PARA GESTOR DE PRODUCTOS
+// ============================================
+
+// Productos (gestión completa)
+app.MapGet("/api/productos/gestion", [Authorize(Roles = "Gestor_Productos")] async (bool includeInactivos, IProductManagementService service) =>
+{
+    var productos = await service.GetAllProductosAsync(includeInactivos);
+    return Results.Ok(productos);
+});
+
+app.MapGet("/api/productos/gestion/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+{
+    var producto = await service.GetProductoByIdAsync(id);
+    return producto is not null ? Results.Ok(producto) : Results.NotFound();
+});
+
+app.MapPost("/api/productos/gestion", [Authorize(Roles = "Gestor_Productos")] async (HttpRequest request, IProductManagementService service, HttpContext httpContext, IWebHostEnvironment env) =>
+{
+    var form = await request.ReadFormAsync();
+    var createRequest = new CreateProductoRequest
+    {
+        Sku = form["Sku"],
+        Codigo = form["Codigo"],
+        MarcaId = int.Parse(form["MarcaId"]),
+        CategoriaId = string.IsNullOrEmpty(form["CategoriaId"]) ? null : int.Parse(form["CategoriaId"]),
+        Modelo = form["Modelo"],
+        Especificacion = form["Especificacion"],
+        Descripcion = form["Descripcion"],
+        Precio = decimal.Parse(form["Precio"]),
+        DiasGarantia = int.Parse(form["DiasGarantia"]),
+        Visibilidad = form["Visibilidad"],
+        PesoKg = string.IsNullOrEmpty(form["PesoKg"]) ? null : decimal.Parse(form["PesoKg"]),
+        AltoCm = decimal.Parse(form["AltoCm"]),
+        AnchoCm = decimal.Parse(form["AnchoCm"]),
+        ProfundidadCm = decimal.Parse(form["ProfundidadCm"]),
+        ImagenPrincipal = form.Files.GetFile("ImagenPrincipal"),
+        ImagenesAdicionales = form.Files.Where(f => f.Name == "ImagenesAdicionales").ToList()
+    };
+
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var producto = await service.CreateProductoAsync(createRequest, usuarioId, env.WebRootPath);
+        return Results.Created($"/api/productos/gestion/{producto.Id}", producto);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPut("/api/productos/gestion", [Authorize(Roles = "Gestor_Productos")] async (HttpRequest request, IProductManagementService service, HttpContext httpContext, IWebHostEnvironment env) =>
+{
+    var form = await request.ReadFormAsync();
+    var updateRequest = new UpdateProductoRequest
+    {
+        Id = int.Parse(form["Id"]),
+        Sku = form["Sku"],
+        Codigo = form["Codigo"],
+        MarcaId = int.Parse(form["MarcaId"]),
+        CategoriaId = string.IsNullOrEmpty(form["CategoriaId"]) ? null : int.Parse(form["CategoriaId"]),
+        Modelo = form["Modelo"],
+        Especificacion = form["Especificacion"],
+        Descripcion = form["Descripcion"],
+        Precio = decimal.Parse(form["Precio"]),
+        DiasGarantia = int.Parse(form["DiasGarantia"]),
+        Visibilidad = form["Visibilidad"],
+        Activo = bool.Parse(form["Activo"]),
+        PesoKg = string.IsNullOrEmpty(form["PesoKg"]) ? null : decimal.Parse(form["PesoKg"]),
+        AltoCm = decimal.Parse(form["AltoCm"]),
+        AnchoCm = decimal.Parse(form["AnchoCm"]),
+        ProfundidadCm = decimal.Parse(form["ProfundidadCm"]),
+        ImagenPrincipal = form.Files.GetFile("ImagenPrincipal"),
+        ImagenesAdicionales = form.Files.Where(f => f.Name == "ImagenesAdicionales").ToList(),
+        ImagenesAEliminar = form["ImagenesAEliminar"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+    };
+
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var producto = await service.UpdateProductoAsync(updateRequest, usuarioId, env.WebRootPath);
+        return Results.Ok(producto);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPatch("/api/productos/gestion/{id:int}/toggle", [Authorize(Roles = "Gestor_Productos")] async (int id, bool activo, IProductManagementService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var result = await service.ToggleProductoActivoAsync(id, activo, usuarioId);
+    return result ? Results.Ok() : Results.NotFound();
+});
+
+// Categorías (gestión)
+app.MapGet("/api/productos/categorias", [Authorize(Roles = "Gestor_Productos")] async (bool includeInactivos, IProductManagementService service) =>
+{
+    var categorias = await service.GetAllCategoriasAsync(includeInactivos);
+    return Results.Ok(categorias);
+});
+
+app.MapGet("/api/productos/categorias/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+{
+    var categoria = await service.GetCategoriaByIdAsync(id);
+    return categoria is not null ? Results.Ok(categoria) : Results.NotFound();
+});
+
+app.MapPost("/api/productos/categorias", [Authorize(Roles = "Gestor_Productos")] async (CreateCategoriaRequest request, IProductManagementService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var categoria = await service.CreateCategoriaAsync(request, usuarioId);
+        return Results.Created($"/api/productos/categorias/{categoria.Id}", categoria);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPut("/api/productos/categorias", [Authorize(Roles = "Gestor_Productos")] async (UpdateCategoriaRequest request, IProductManagementService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var categoria = await service.UpdateCategoriaAsync(request, usuarioId);
+        return Results.Ok(categoria);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapDelete("/api/productos/categorias/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+{
+    try
+    {
+        var result = await service.DeleteCategoriaAsync(id);
+        return result ? Results.Ok() : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+// Marcas (gestión)
+app.MapGet("/api/productos/marcas", [Authorize(Roles = "Gestor_Productos")] async (IProductManagementService service) =>
+{
+    var marcas = await service.GetAllMarcasAsync();
+    return Results.Ok(marcas);
+});
+
+app.MapGet("/api/productos/marcas/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+{
+    var marca = await service.GetMarcaByIdAsync(id);
+    return marca is not null ? Results.Ok(marca) : Results.NotFound();
+});
+
+app.MapPost("/api/productos/marcas", [Authorize(Roles = "Gestor_Productos")] async (CreateMarcaRequest request, IProductManagementService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var marca = await service.CreateMarcaAsync(request, usuarioId);
+        return Results.Created($"/api/productos/marcas/{marca.Id}", marca);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapPut("/api/productos/marcas", [Authorize(Roles = "Gestor_Productos")] async (UpdateMarcaRequest request, IProductManagementService service, HttpContext httpContext) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        var marca = await service.UpdateMarcaAsync(request, usuarioId);
+        return Results.Ok(marca);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
+
+app.MapDelete("/api/productos/marcas/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+{
+    try
+    {
+        var result = await service.DeleteMarcaAsync(id);
+        return result ? Results.Ok() : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
 
 app.Run();

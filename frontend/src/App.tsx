@@ -17,6 +17,8 @@ import Cart from '../components/Ecommerce/Cart';
 import ProductDetail from '../components/Ecommerce/ProductDetail';
 import Checkout from '../components/Payphone/Checkout';
 import PayphoneResponse from '../components/Payphone/PayphoneResponse';
+import InventarioDashboard from '../components/Inventario/InventarioDashboard';
+import ProductosDashboard from '../components/Productos/ProductosDashboard';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -52,6 +54,10 @@ const DashboardRouter: React.FC = () => {
       return <EntregaDashboard />;
     case 'Administrador':
       return <DatosEmpresaConfig />;
+    case 'Encargado_Inventario':
+      return <InventarioDashboard />;
+    case 'Gestor_Productos':
+      return <ProductosDashboard />;
     default:
       return (
         <Box sx={{ p: 3, textAlign: 'center' }}>

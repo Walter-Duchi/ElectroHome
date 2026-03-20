@@ -14,4 +14,8 @@
     <Folder Include="DTOs\Facturacion\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.9" />
+  </ItemGroup>
+
 </Project>
