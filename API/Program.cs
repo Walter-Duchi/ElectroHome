@@ -118,6 +118,7 @@ builder.Services.AddScoped<IFacturacionService, FacturacionService>();
 builder.Services.AddScoped<IPayphoneService, PayphoneService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
+builder.Services.AddScoped<IAnalistaService, AnalistaService>();
 builder.Services.AddSriSignService(builder.Configuration, "SriSign");
 builder.Services.AddHttpClient();
 
@@ -1673,6 +1674,28 @@ app.MapDelete("/api/productos/marcas/{id:int}", [Authorize(Roles = "Gestor_Produ
     {
         return Results.BadRequest(new { message = ex.Message });
     }
+});
+
+// ============================================
+// ENDPOINTS PARA ANALISTA DE DATOS
+// ============================================
+
+app.MapGet("/api/analista/dashboard", [Authorize(Roles = "Analista_Datos")] async (IAnalistaService service) =>
+{
+    var dashboard = await service.ObtenerDashboardAsync();
+    return Results.Ok(dashboard);
+});
+
+app.MapGet("/api/analista/exportar/ventas", [Authorize(Roles = "Analista_Datos")] async (DateTime? desde, DateTime? hasta, IAnalistaService service) =>
+{
+    var csv = await service.ExportarReporteVentasAsync(desde, hasta);
+    return Results.File(csv, "text/csv", $"ventas_{DateTime.Now:yyyyMMdd}.csv");
+});
+
+app.MapGet("/api/analista/exportar/inventario", [Authorize(Roles = "Analista_Datos")] async (IAnalistaService service) =>
+{
+    var csv = await service.ExportarReporteInventarioAsync();
+    return Results.File(csv, "text/csv", $"inventario_{DateTime.Now:yyyyMMdd}.csv");
 });
 
 app.Run();

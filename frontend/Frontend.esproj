@@ -15,6 +15,7 @@
     <Folder Include="components\Cliente\" />
     <Folder Include="components\Admin\" />
     <Folder Include="components\Inventario\" />
+    <Folder Include="components\Analista\" />
     <Folder Include="components\Productos\" />
     <Folder Include="components\Payphone\" />
     <Folder Include="components\ThemeSelector\" />

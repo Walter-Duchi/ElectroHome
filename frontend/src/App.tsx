@@ -19,6 +19,7 @@ import Checkout from '../components/Payphone/Checkout';
 import PayphoneResponse from '../components/Payphone/PayphoneResponse';
 import InventarioDashboard from '../components/Inventario/InventarioDashboard';
 import ProductosDashboard from '../components/Productos/ProductosDashboard';
+import AnalistaDashboard from '../components/Analista/AnalistaDashboard';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -58,6 +59,8 @@ const DashboardRouter: React.FC = () => {
       return <InventarioDashboard />;
     case 'Gestor_Productos':
       return <ProductosDashboard />;
+    case 'Analista_Datos':
+      return <AnalistaDashboard />;
     default:
       return (
         <Box sx={{ p: 3, textAlign: 'center' }}>

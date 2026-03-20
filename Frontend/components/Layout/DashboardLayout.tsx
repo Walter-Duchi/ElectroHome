@@ -31,6 +31,7 @@ import {
   Inventory,
   ShoppingCart,
   Store,
+  ShowChart,
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
 import CreateUserModal from '../Navbar/CreateUserModal';
@@ -212,6 +213,18 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               sx={{ mr: 2 }}
             >
               Inventario
+            </Button>
+          )}
+
+          {userRole === 'Analista_Datos' && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<ShowChart />}
+              onClick={() => navigate('/app/analista')}
+              sx={{ mr: 2 }}
+            >
+              Dashboard
             </Button>
           )}
 
