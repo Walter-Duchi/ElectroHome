@@ -1476,13 +1476,13 @@ app.MapPatch("/api/inventario/proveedores/{id:int}/toggle", [Authorize(Roles = "
 // ============================================
 
 // Productos (gestión completa)
-app.MapGet("/api/productos/gestion", [Authorize(Roles = "Gestor_Productos")] async (bool includeInactivos, IProductManagementService service) =>
+app.MapGet("/api/productos/gestion", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (bool includeInactivos, IProductManagementService service) =>
 {
     var productos = await service.GetAllProductosAsync(includeInactivos);
     return Results.Ok(productos);
 });
 
-app.MapGet("/api/productos/gestion/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+app.MapGet("/api/productos/gestion/{id:int}", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (int id, IProductManagementService service) =>
 {
     var producto = await service.GetProductoByIdAsync(id);
     return producto is not null ? Results.Ok(producto) : Results.NotFound();
@@ -1569,13 +1569,13 @@ app.MapPatch("/api/productos/gestion/{id:int}/toggle", [Authorize(Roles = "Gesto
 });
 
 // Categorías (gestión)
-app.MapGet("/api/productos/categorias", [Authorize(Roles = "Gestor_Productos")] async (bool includeInactivos, IProductManagementService service) =>
+app.MapGet("/api/productos/categorias", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (bool includeInactivos, IProductManagementService service) =>
 {
     var categorias = await service.GetAllCategoriasAsync(includeInactivos);
     return Results.Ok(categorias);
 });
 
-app.MapGet("/api/productos/categorias/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+app.MapGet("/api/productos/categorias/{id:int}", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (int id, IProductManagementService service) =>
 {
     var categoria = await service.GetCategoriaByIdAsync(id);
     return categoria is not null ? Results.Ok(categoria) : Results.NotFound();
@@ -1623,13 +1623,13 @@ app.MapDelete("/api/productos/categorias/{id:int}", [Authorize(Roles = "Gestor_P
 });
 
 // Marcas (gestión)
-app.MapGet("/api/productos/marcas", [Authorize(Roles = "Gestor_Productos")] async (IProductManagementService service) =>
+app.MapGet("/api/productos/marcas", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (IProductManagementService service) =>
 {
     var marcas = await service.GetAllMarcasAsync();
     return Results.Ok(marcas);
 });
 
-app.MapGet("/api/productos/marcas/{id:int}", [Authorize(Roles = "Gestor_Productos")] async (int id, IProductManagementService service) =>
+app.MapGet("/api/productos/marcas/{id:int}", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (int id, IProductManagementService service) =>
 {
     var marca = await service.GetMarcaByIdAsync(id);
     return marca is not null ? Results.Ok(marca) : Results.NotFound();
