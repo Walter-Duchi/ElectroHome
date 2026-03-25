@@ -10,42 +10,31 @@ if (-not $scriptDir) { $scriptDir = Get-Location }
 # Colores para la consola
 $host.UI.RawUI.ForegroundColor = "Cyan"
 
-# Función para verificar si un puerto está en uso
-function Test-PortInUse {
-    param([int]$Port)
+# Función para verificar si un puerto está en uso y matar el proceso
+function Clear-PortIfBusy {
+    param([int]$Port, [string]$ServiceName)
     $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
     if ($connections) {
         $process = Get-Process -Id $connections.OwningProcess -ErrorAction SilentlyContinue
-        return $true, $process
+        Write-Host "Puerto $Port ($ServiceName) está ocupado por el proceso ID $($process.Id) - $($process.ProcessName). Matando..." -ForegroundColor Yellow
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+        Write-Host "Proceso terminado." -ForegroundColor Green
+    } else {
+        Write-Host "Puerto $Port ($ServiceName) libre." -ForegroundColor Green
     }
-    return $false, $null
 }
 
-# Verificar puertos necesarios
+# Limpiar puertos antes de empezar
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "VERIFICANDO PUERTOS" -ForegroundColor Cyan
+Write-Host "VERIFICANDO Y LIBERANDO PUERTOS" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 $backendPort = 5298
 $frontendPort = 3000
 
-$used, $proc = Test-PortInUse -Port $backendPort
-if ($used) {
-    Write-Host "ERROR: El puerto $backendPort (backend) ya está en uso por el proceso:" -ForegroundColor Red
-    Write-Host "  ID: $($proc.Id) - Nombre: $($proc.ProcessName)" -ForegroundColor Yellow
-    Write-Host "Por favor, libera el puerto y vuelve a ejecutar el script." -ForegroundColor Red
-    exit 1
-}
-
-$used, $proc = Test-PortInUse -Port $frontendPort
-if ($used) {
-    Write-Host "ERROR: El puerto $frontendPort (frontend) ya está en uso por el proceso:" -ForegroundColor Red
-    Write-Host "  ID: $($proc.Id) - Nombre: $($proc.ProcessName)" -ForegroundColor Yellow
-    Write-Host "Por favor, libera el puerto y vuelve a ejecutar el script." -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Puertos libres. Continuando..." -ForegroundColor Green
+Clear-PortIfBusy -Port $backendPort -ServiceName "Backend"
+Clear-PortIfBusy -Port $frontendPort -ServiceName "Frontend"
 
 # Verificar que npm está disponible
 $npmExists = Get-Command npm -ErrorAction SilentlyContinue
@@ -103,8 +92,6 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "INICIANDO FRONTEND (npm run dev)" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
-# Usamos cmd /k para que la ventana permanezca abierta después de que el comando termine (incluso si falla)
-$frontendCommand = "cmd /k `"cd /d `"$frontendDir`" && npm run dev`""
 $frontendProcess = Start-Process -FilePath "cmd" `
     -ArgumentList "/k `"cd /d `"$frontendDir`" && npm run dev`"" `
     -WindowStyle Normal `
@@ -137,5 +124,13 @@ if ($frontendProcess -and (-not $frontendProcess.HasExited)) {
     Stop-Process -Id $frontendProcess.Id -Force -ErrorAction SilentlyContinue
     Write-Host "Frontend detenido." -ForegroundColor Green
 }
+
+# Esperar un momento para que los procesos terminen
+Start-Sleep -Milliseconds 500
+
+# Limpiar puertos nuevamente para asegurar que todo esté liberado
+Write-Host "`nLiberando puertos residuales..." -ForegroundColor Yellow
+Clear-PortIfBusy -Port $backendPort -ServiceName "Backend"
+Clear-PortIfBusy -Port $frontendPort -ServiceName "Frontend"
 
 Write-Host "`n✅ Todos los servicios han sido detenidos correctamente." -ForegroundColor Green
