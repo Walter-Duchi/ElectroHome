@@ -4,6 +4,7 @@ using Infrastructure.Models;
 using Infrastructure.Reclamos.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
+using Application.DTOs.User;
 using System.Text;
 
 namespace Infrastructure.Reclamos.Services
@@ -162,6 +163,142 @@ namespace Infrastructure.Reclamos.Services
             };
 
             return Task.FromResult(rolesPermitidos.Contains(targetRole));
+        }
+
+        // Nuevos métodos
+        public async Task<ProfileResponse> GetProfileAsync(int userId)
+        {
+            var usuario = await _context.Usuarios.FindAsync(userId);
+            if (usuario == null)
+                throw new ArgumentException("Usuario no encontrado");
+
+            return new ProfileResponse
+            {
+                Id = usuario.Id,
+                Nombres = usuario.Nombres,
+                Apellidos = usuario.Apellidos,
+                RazonSocial = usuario.RazonSocial,
+                TipoIdentificacion = usuario.TipoIdentificacion,
+                Identificacion = usuario.Identificacion,
+                Ruc = usuario.Ruc,
+                Correo = usuario.Correo,
+                Celular = usuario.Celular,
+                Convencional = usuario.Convencional,
+                Pais = usuario.Pais,
+                DivisionAdministrativa = usuario.DivisionAdministrativa,
+                Ciudad = usuario.Ciudad,
+                CodigoPostal = usuario.CodigoPostal,
+                Direccion = usuario.Direccion,
+                Rol = usuario.Rol,
+                FechaCreacion = usuario.FechaCreacion,
+                NumCuentaBancaria = usuario.NumCuentaBancaria,
+                TipoCuentaBancaria = usuario.TipoCuentaBancaria,
+                ContribuyenteEspecial = usuario.ContribuyenteEspecial,
+                ObligadoContabilidad = usuario.ObligadoContabilidad,
+                Activo = usuario.Activo
+            };
+        }
+
+        public async Task<bool> UpdateProfileAsync(int userId, UpdateProfileRequest request)
+        {
+            var usuario = await _context.Usuarios.FindAsync(userId);
+            if (usuario == null)
+                throw new ArgumentException("Usuario no encontrado");
+
+            // Validar y actualizar correo
+            if (!string.IsNullOrEmpty(request.Correo) && request.Correo != usuario.Correo)
+            {
+                // Verificar que no exista otro usuario con ese correo
+                var existe = await _context.Usuarios.AnyAsync(u => u.Correo == request.Correo && u.Id != userId);
+                if (existe)
+                    throw new ArgumentException("El correo ya está registrado por otro usuario");
+
+                // Validar formato de correo
+                if (!IsValidEmail(request.Correo))
+                    throw new ArgumentException("Formato de correo inválido");
+
+                usuario.Correo = request.Correo;
+            }
+
+            // Actualizar celular
+            if (!string.IsNullOrEmpty(request.Celular))
+            {
+                if (!IsValidCelular(request.Celular))
+                    throw new ArgumentException("Formato de celular inválido (debe ser 09XXXXXXXX)");
+                usuario.Celular = request.Celular;
+            }
+
+            // Actualizar convencional (opcional)
+            usuario.Convencional = string.IsNullOrEmpty(request.Convencional) ? null : request.Convencional;
+
+            // Actualizar ciudad
+            if (!string.IsNullOrEmpty(request.Ciudad))
+                usuario.Ciudad = request.Ciudad;
+
+            // Actualizar código postal
+            if (!string.IsNullOrEmpty(request.CodigoPostal))
+            {
+                if (!IsValidPostalCode(request.CodigoPostal))
+                    throw new ArgumentException("Código postal inválido (6 dígitos)");
+                usuario.CodigoPostal = request.CodigoPostal;
+            }
+
+            // Actualizar dirección
+            if (!string.IsNullOrEmpty(request.Direccion))
+                usuario.Direccion = request.Direccion;
+
+            // Cambio de contraseña
+            if (!string.IsNullOrEmpty(request.NewPassword) || !string.IsNullOrEmpty(request.CurrentPassword))
+            {
+                if (string.IsNullOrEmpty(request.CurrentPassword))
+                    throw new ArgumentException("Debe proporcionar la contraseña actual para cambiarla");
+
+                if (string.IsNullOrEmpty(request.NewPassword))
+                    throw new ArgumentException("Debe proporcionar la nueva contraseña");
+
+                if (request.NewPassword != request.ConfirmNewPassword)
+                    throw new ArgumentException("Las nuevas contraseñas no coinciden");
+
+                // Verificar contraseña actual
+                var currentHash = HashPassword(request.CurrentPassword);
+                if (!currentHash.SequenceEqual(usuario.Contrasena))
+                    throw new ArgumentException("La contraseña actual es incorrecta");
+
+                // Validar longitud mínima
+                if (request.NewPassword.Length < 6)
+                    throw new ArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+
+                // Actualizar contraseña
+                usuario.Contrasena = HashPassword(request.NewPassword);
+            }
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // Métodos auxiliares privados
+        private bool IsValidEmail(string email)
+        {
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(email);
+                return addr.Address == email;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool IsValidCelular(string celular)
+        {
+            var cleaned = System.Text.RegularExpressions.Regex.Replace(celular, @"\D", "");
+            return cleaned.Length == 10 && cleaned.StartsWith("09");
+        }
+
+        private bool IsValidPostalCode(string codigoPostal)
+        {
+            return System.Text.RegularExpressions.Regex.IsMatch(codigoPostal, @"^\d{6}$");
         }
     }
 }

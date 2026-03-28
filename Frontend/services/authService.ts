@@ -7,17 +7,20 @@ export const authService = {
             const response = await api.post<LoginResponse>('/auth/login', credentials);
 
             if (response.data.token) {
-                // Guardar en localStorage
+                // Guardar en localStorage con todos los campos
                 localStorage.setItem('token', response.data.token);
                 localStorage.setItem('user', JSON.stringify({
                     id: response.data.id,
                     correo: response.data.correo,
-                    rol: response.data.rol
+                    rol: response.data.rol,
+                    nombres: response.data.nombres,
+                    apellidos: response.data.apellidos
                 }));
             }
 
             return response.data;
         } catch (error: any) {
+            // ... manejo de errores igual que antes
             if (error.response?.status === 401) {
                 const errorMessage = error.response?.data?.message || error.response?.data;
 

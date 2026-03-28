@@ -20,6 +20,7 @@ import PayphoneResponse from '../components/Payphone/PayphoneResponse';
 import InventarioDashboard from '../components/Inventario/InventarioDashboard';
 import ProductosDashboard from '../components/Productos/ProductosDashboard';
 import AnalistaDashboard from '../components/Analista/AnalistaDashboard';
+import Profile from '../components/Profile/Profile'; // <-- Importar componente
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -116,6 +117,13 @@ const AppContent: React.FC = () => {
           <ProtectedRoute>
             <DashboardLayout>
               <DashboardRouter />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/app/perfil" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <Profile />
             </DashboardLayout>
           </ProtectedRoute>
         } />

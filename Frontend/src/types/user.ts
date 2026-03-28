@@ -33,3 +33,40 @@ export interface CreateUserResponse {
 export interface AllowedRolesResponse {
     allowedRoles: string[];
 }
+
+export interface ProfileResponse {
+    id: number;
+    nombres: string;
+    apellidos: string;
+    razonSocial?: string;
+    tipoIdentificacion: string;
+    identificacion: string;
+    ruc?: string;
+    correo: string;
+    celular: string;
+    convencional?: string;
+    pais: string;
+    divisionAdministrativa: string;
+    ciudad: string;
+    codigoPostal: string;
+    direccion: string;
+    rol: string;
+    fechaCreacion: string;
+    numCuentaBancaria: string;
+    tipoCuentaBancaria: string;
+    contribuyenteEspecial: boolean;
+    obligadoContabilidad: boolean;
+    activo: boolean;
+}
+
+export interface UpdateProfileRequest {
+    correo?: string;
+    celular?: string;
+    convencional?: string;
+    ciudad?: string;
+    codigoPostal?: string;
+    direccion?: string;
+    currentPassword?: string;
+    newPassword?: string;
+    confirmNewPassword?: string;
+}

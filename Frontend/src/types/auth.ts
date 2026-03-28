@@ -8,12 +8,16 @@ export interface LoginResponse {
     id: number;
     correo: string;
     rol: string;
+    nombres: string;
+    apellidos: string;
 }
 
 export interface User {
     id: number;
     correo: string;
     rol: string;
+    nombres: string;
+    apellidos: string;
 }
 
 export interface AuthState {

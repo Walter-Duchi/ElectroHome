@@ -1,4 +1,5 @@
 ﻿using Application.DTOs.Reclamos.User;
+using Application.DTOs.User;
 
 namespace Infrastructure.Reclamos.Interfaces
 {
@@ -6,5 +7,7 @@ namespace Infrastructure.Reclamos.Interfaces
     {
         Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, int creadoPorId);
         Task<bool> CanCreateRole(string creatorRole, string targetRole);
+        Task<ProfileResponse> GetProfileAsync(int userId);
+        Task<bool> UpdateProfileAsync(int userId, UpdateProfileRequest request);
     }
 }

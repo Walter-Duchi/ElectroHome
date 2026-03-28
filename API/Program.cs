@@ -8,8 +8,8 @@ using Application.DTOs.Reclamos.Entrega;
 using Application.DTOs.Reclamos.Reclamo;
 using Application.DTOs.Reclamos.Tecnico;
 using Application.DTOs.Reclamos.User;
+using Application.DTOs.User;
 using Infrastructure.Data;
-using Infrastructure.Facturacion.Services;
 using Infrastructure.Facturacion.Services;
 using Infrastructure.Payphone.DTOs;
 using Infrastructure.Payphone.Services;
@@ -1698,5 +1698,55 @@ app.MapGet("/api/analista/exportar/inventario", [Authorize(Roles = "Analista_Dat
     var csv = await service.ExportarReporteInventarioAsync();
     return Results.File(csv, "text/csv", $"inventario_{DateTime.Now:yyyyMMdd}.csv");
 });
+
+// ============================================
+// ENDPOINTS PARA PERFIL DE USUARIO (TODOS LOS ROLES)
+// ============================================
+
+app.MapGet("/api/user/profile", [Authorize] async (HttpContext httpContext, IUserService userService) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation("Obteniendo perfil del usuario ID: {UserId}", userId);
+
+        var profile = await userService.GetProfileAsync(userId);
+        return Results.Ok(profile);
+    }
+    catch (ArgumentException ex)
+    {
+        logger.LogWarning(ex, "Error al obtener perfil");
+        return Results.NotFound(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error interno al obtener perfil");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+}).WithName("GetUserProfile");
+
+app.MapPut("/api/user/profile", [Authorize] async (UpdateProfileRequest request, HttpContext httpContext, IUserService userService) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        logger.LogInformation("Actualizando perfil del usuario ID: {UserId}", userId);
+
+        var success = await userService.UpdateProfileAsync(userId, request);
+        return Results.Ok(new { message = "Perfil actualizado exitosamente" });
+    }
+    catch (ArgumentException ex)
+    {
+        logger.LogWarning(ex, "Error de validación al actualizar perfil");
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error interno al actualizar perfil");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+}).WithName("UpdateUserProfile");
 
 app.Run();

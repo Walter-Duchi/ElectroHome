@@ -1,6 +1,5 @@
 import api from './api';
-import { type CreateUserRequest, type CreateUserResponse } from '../src/types/user';
-
+import { type CreateUserRequest, type CreateUserResponse, type ProfileResponse, type UpdateProfileRequest } from '../src/types/user';
 export const userService = {
     async createUser(userData: CreateUserRequest): Promise<CreateUserResponse> {
         try {
@@ -60,5 +59,28 @@ export const userService = {
     validatePostalCode(codigoPostal: string): boolean {
         // Validar que sea un código postal válido para Guayaquil (6 dígitos)
         return /^\d{6}$/.test(codigoPostal);
+    },
+
+    async getProfile(): Promise<ProfileResponse> {
+        try {
+            const response = await api.get<ProfileResponse>('/user/profile');
+            return response.data;
+        } catch (error: any) {
+            if (error.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw new Error('Error al obtener perfil');
+        }
+    },
+
+    async updateProfile(data: UpdateProfileRequest): Promise<void> {
+        try {
+            await api.put('/user/profile', data);
+        } catch (error: any) {
+            if (error.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw new Error('Error al actualizar perfil');
+        }
     }
 };

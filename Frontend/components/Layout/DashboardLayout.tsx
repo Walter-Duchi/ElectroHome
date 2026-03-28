@@ -17,11 +17,9 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Notifications as NotificationsIcon,
   AccountCircle,
   Settings,
   ExitToApp,
-  People,
   Add,
   Engineering,
   LocalShipping,
@@ -46,6 +44,11 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { auth, logout, userRole } = useAuth();
+
+  // Obtener nombre completo del usuario
+  const nombreCompleto = auth.user?.nombres && auth.user?.apellidos
+    ? `${auth.user.nombres} ${auth.user.apellidos}`
+    : auth.user?.correo?.split('@')[0] || 'Usuario';
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -228,9 +231,20 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
           )}
 
-          <IconButton onClick={handleMenuOpen} color="inherit">
-            <AccountCircle />
-          </IconButton>
+          {/* Área clickeable: nombre, rol e icono */}
+          <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={handleMenuOpen}>
+            <Box sx={{ textAlign: 'right', mr: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
+                {nombreCompleto}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {userRole}
+              </Typography>
+            </Box>
+            <IconButton color="inherit" edge="end">
+              <AccountCircle />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -247,14 +261,13 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           },
         }}
       >
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={() => { handleMenuClose(); navigate('/app/perfil'); }}>
           <ListItemIcon>
             <AccountCircle fontSize="small" />
           </ListItemIcon>
           <ListItemText>Mi Perfil</ListItemText>
         </MenuItem>
 
-        {/* Selector de tema como ítem de menú */}
         <ThemeSelector variant="menu-item" />
 
         <MenuItem onClick={handleMenuClose}>

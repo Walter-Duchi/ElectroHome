@@ -48,7 +48,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const user = JSON.parse(userStr);
           setAuth({
-            user: user,
+            user: {
+              id: user.id,
+              correo: user.correo,
+              rol: user.rol,
+              nombres: user.nombres,
+              apellidos: user.apellidos
+            },
             token,
             isAuthenticated: true,
           });
@@ -81,6 +87,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           id: response.id,
           correo: response.correo,
           rol: response.rol,
+          nombres: response.nombres,
+          apellidos: response.apellidos
         },
         token: response.token,
         isAuthenticated: true,
@@ -102,7 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isAuthenticated: false,
     });
     setUserRole(null);
-    window.location.href = '/'; // antes era '/login'
+    window.location.href = '/';
   };
 
   return (

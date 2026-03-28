@@ -66,7 +66,9 @@ namespace Infrastructure.Reclamos.Services
                 Token = token,
                 Id = usuario.Id,
                 Correo = usuario.Correo,
-                Rol = usuario.Rol
+                Rol = usuario.Rol,
+                Nombres =  usuario.Nombres,
+                Apellidos = usuario.Apellidos
             };
         }
 
