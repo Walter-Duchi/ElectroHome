@@ -7,11 +7,12 @@ import {
 import { Add, Refresh } from '@mui/icons-material';
 import { inventarioService } from '../../services/inventarioService';
 import { productoManagementService } from '../../services/productoManagementService';
-import type { Ubicacion, Proveedor } from '../../src/types/inventario';
 import type { ProductoManagement } from '../../src/types/producto';
+import type { Ubicacion, Proveedor } from '../../src/types/inventario';
 import UbicacionesList from './UbicacionesList';
 import MovimientosList from './MovimientosList';
 import EntradaProductoForm from './EntradaProductoForm';
+import NumerosSerieList from './NumerosSerieList';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -268,8 +269,11 @@ const InventarioDashboard: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
-          {/* Componente de números de serie (simplificado) */}
-          <Typography>Gestión de números de serie (pendiente implementación detallada)</Typography>
+          <NumerosSerieList
+            productos={productos}
+            ubicaciones={ubicaciones}
+            onRefresh={cargarDatos}
+          />
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
@@ -278,7 +282,6 @@ const InventarioDashboard: React.FC = () => {
               Nuevo Proveedor
             </Button>
           </Box>
-          {/* Lista simple de proveedores */}
           {proveedores.map(p => (
             <Paper key={p.id} sx={{ p: 2, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
