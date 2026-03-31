@@ -270,6 +270,11 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
         <ThemeSelector variant="menu-item" />
 
+        <MenuItem onClick={() => { handleMenuClose(); navigate('/mis-facturas'); }}>
+          <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
+          <ListItemText>Mis Facturas</ListItemText>
+        </MenuItem>
+
         <MenuItem onClick={handleMenuClose}>
           <ListItemIcon>
             <Settings fontSize="small" />

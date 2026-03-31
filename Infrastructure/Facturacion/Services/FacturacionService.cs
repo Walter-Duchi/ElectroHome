@@ -49,18 +49,15 @@ namespace Infrastructure.Facturacion.Services
             _logger = logger;
         }
 
-        // Método público que implementa la interfaz
         public async Task FacturarVenta(int ventaId)
         {
             await FacturarVentaConReintento(ventaId, 1);
         }
 
-        // Método privado que maneja los reintentos
         private async Task FacturarVentaConReintento(int ventaId, int intento)
         {
             _logger.LogInformation("=== INTENTO {Intento} de facturación para venta {VentaId} ===", intento, ventaId);
 
-            // 1. Obtener datos de la venta, cliente y productos
             var venta = await _context.Ventas
                 .Include(v => v.FkEmpresaClienteNavigation)
                 .Include(v => v.VentasPorNumeroSerieProductos)
@@ -71,13 +68,11 @@ namespace Infrastructure.Facturacion.Services
             if (venta == null)
                 throw new Exception("Venta no encontrada");
 
-            // Calcular secuencial de 9 dígitos (rellenar con ceros a la izquierda)
             var secuencial = venta.CodigoFactura.Split('-').Last().PadLeft(9, '0');
 
-            // Calcular totales correctamente a partir de los detalles
             var detallesFactura = venta.VentasPorNumeroSerieProductos.Select(vp => new
             {
-                BaseImponible = vp.PrecioVenta - vp.Iva, // precio sin IVA
+                BaseImponible = vp.PrecioVenta - vp.Iva,
                 Iva = vp.Iva,
                 Descuento = vp.Descuento ?? 0,
                 Sku = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "",
@@ -90,25 +85,52 @@ namespace Infrastructure.Facturacion.Services
             var totalIva = detallesFactura.Sum(d => d.Iva);
             var totalDescuento = detallesFactura.Sum(d => d.Descuento);
 
-            // Validar que el total de la venta coincida con los cálculos (solo logging)
-            if (Math.Abs(totalSinImpuestos + totalIva - venta.TotalCompra) > 0.01m)
+            var cliente = venta.FkEmpresaClienteNavigation;
+
+            // Determinar tipo de identificación según la longitud del campo Identificacion
+            string tipoIdentificacion;
+            string identificacion = cliente.Identificacion ?? "";
+            string razonSocial;
+
+            if (identificacion.Length == 13)
             {
-                _logger.LogWarning("Inconsistencia en totales: venta.TotalCompra={VentaTotal}, calculado={Calculado}",
-                    venta.TotalCompra, totalSinImpuestos + totalIva);
+                tipoIdentificacion = "04"; // RUC
+                razonSocial = cliente.RazonSocial ?? $"{cliente.Nombres} {cliente.Apellidos}";
+            }
+            else if (identificacion.Length == 10)
+            {
+                tipoIdentificacion = "05"; // Cédula
+                razonSocial = $"{cliente.Nombres} {cliente.Apellidos}";
+            }
+            else
+            {
+                tipoIdentificacion = "05"; // Consumidor final
+                razonSocial = "CONSUMIDOR FINAL";
+                identificacion = "9999999999999";
             }
 
-            // 2. Generar XML de factura (versión 1.0.0)
+            // Si no hay identificación, usar consumidor final
+            if (string.IsNullOrEmpty(identificacion))
+            {
+                tipoIdentificacion = "05";
+                identificacion = "9999999999999";
+                razonSocial = "CONSUMIDOR FINAL";
+            }
+
+            var fechaEmision = venta.FechaCompra?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                                ?? DateTime.Now.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
             var factura = new Factura
             {
                 InfoTributaria = new InfoTributaria
                 {
-                    ambiente = "1", // pruebas
-                    tipoEmision = "1", // normal
+                    ambiente = "1",
+                    tipoEmision = "1",
                     razonSocial = "DUCHI RIVERA WALTER ALEJANDRO",
                     nombreComercial = "SOFTWARE HOME",
                     ruc = "0950734061001",
-                    claveAcceso = "", // se llenará después
-                    codDoc = "01", // factura
+                    claveAcceso = "",
+                    codDoc = "01",
                     estab = "001",
                     ptoEmi = "001",
                     secuencial = secuencial,
@@ -117,21 +139,21 @@ namespace Infrastructure.Facturacion.Services
                 },
                 InfoFactura = new InfoFactura
                 {
-                    fechaEmision = venta.FechaCompra?.ToString("dd/MM/yyyy") ?? "",
+                    fechaEmision = fechaEmision,
                     dirEstablecimiento = "RIO AGUARICO Y RIO PASTAZA 123 Y CALLE B, MILAGRO",
                     obligadoContabilidad = "NO",
-                    tipoIdentificacionComprador = "04", // RUC
-                    razonSocialComprador = "PRUEBAS SERVICIO DE RENTAS INTERNAS",
-                    identificacionComprador = "1790012347001", // RUC de prueba según ficha técnica
-                    direccionComprador = "QUITO",
+                    tipoIdentificacionComprador = tipoIdentificacion,
+                    razonSocialComprador = razonSocial,
+                    identificacionComprador = identificacion,
+                    direccionComprador = cliente.Direccion ?? "",
                     totalSinImpuestos = Math.Round(totalSinImpuestos, 2),
                     totalDescuento = Math.Round(totalDescuento, 2),
                     totalConImpuestos = new System.Collections.Generic.List<TotalImpuesto>
                     {
                         new TotalImpuesto
                         {
-                            codigo = "2", // IVA
-                            codigoPorcentaje = "4", // 15% (código según tabla 17)
+                            codigo = "2",
+                            codigoPorcentaje = "4",
                             baseImponible = Math.Round(totalSinImpuestos, 2),
                             valor = Math.Round(totalIva, 2)
                         }
@@ -143,7 +165,7 @@ namespace Infrastructure.Facturacion.Services
                     {
                         new PagoFactura
                         {
-                            formaPago = "01", // efectivo
+                            formaPago = "01",
                             total = venta.TotalCompra
                         }
                     }
@@ -151,7 +173,6 @@ namespace Infrastructure.Facturacion.Services
                 Detalles = venta.VentasPorNumeroSerieProductos.Select(vp => new Detalle
                 {
                     CodigoPrincipal = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Sku ?? "",
-                    CodigoAuxiliar = "", // vacío, no se serializará
                     descripcion = vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Descripcion ?? "",
                     cantidad = 1,
                     precioUnitario = Math.Round((vp.PrecioVenta - vp.Iva) + (vp.Descuento ?? 0), 2),
@@ -173,13 +194,12 @@ namespace Infrastructure.Facturacion.Services
                 {
                     Campos = new System.Collections.Generic.List<CampoAdicional>
                     {
-                        new CampoAdicional { Nombre = "Email", Valor = venta.FkEmpresaClienteNavigation.Correo ?? "" },
-                        new CampoAdicional { Nombre = "Teléfono", Valor = venta.FkEmpresaClienteNavigation.Celular ?? "" }
+                        new CampoAdicional { Nombre = "Email", Valor = cliente.Correo ?? "" },
+                        new CampoAdicional { Nombre = "Teléfono", Valor = cliente.Celular ?? "" }
                     }
                 }
             };
 
-            // Generar clave de acceso
             factura.InfoTributaria.claveAcceso = ClaveAccesoHelper.GenerarClaveAcceso(
                 venta.FechaCompra ?? throw new InvalidOperationException("Fecha de compra no puede ser nula"),
                 factura.InfoTributaria.ruc,
@@ -188,23 +208,15 @@ namespace Infrastructure.Facturacion.Services
                 secuencial
             );
 
-            // Serializar a XML
             var xmlSinFirma = SerializarAFacturaXml(factura);
-
-            // Firmar electrónicamente
             var xmlFirmado = await _firmaService.FirmarXmlAsync(xmlSinFirma);
 
-            // Guardar XML firmado para inspección manual (opcional)
-            File.WriteAllText("C:/temp/xmlFirmado.xml", xmlFirmado);
-
-            // Enviar al SRI
             var bytesXml = Encoding.UTF8.GetBytes(xmlFirmado);
             SriRecepcion.validarComprobanteResponse respuestaRecepcion;
 
             try
             {
                 respuestaRecepcion = await _sriService.EnviarComprobante(bytesXml);
-                _logger.LogInformation("Respuesta de recepción: {Estado}", respuestaRecepcion?.RespuestaRecepcionComprobante?.estado);
             }
             catch (Exception ex)
             {
@@ -214,11 +226,9 @@ namespace Infrastructure.Facturacion.Services
                 throw;
             }
 
-            // Capturar el XML crudo de la respuesta de recepción (guardado por el inspector)
             string rawRecepcionXml = MessageInspectorStorage.LastResponseXml;
-            MessageInspectorStorage.LastResponseXml = null; // limpiar
+            MessageInspectorStorage.LastResponseXml = null;
 
-            // --- Procesar respuesta de recepción ---
             bool esErrorSecuencialRegistrado = false;
             bool esClaveEnProcesamiento = false;
             if (!string.IsNullOrEmpty(rawRecepcionXml))
@@ -247,124 +257,92 @@ namespace Infrastructure.Facturacion.Services
                 }
             }
 
-            // Caso 1: Error secuencial registrado (ya facturado)
             if (esErrorSecuencialRegistrado)
             {
-                _logger.LogWarning("Detectado ERROR SECUENCIAL REGISTRADO (identificador 45) en la respuesta de recepción para la venta {VentaId}. La venta ya fue facturada previamente.", ventaId);
-
+                _logger.LogWarning("Detectado ERROR SECUENCIAL REGISTRADO (identificador 45) para la venta {VentaId}. La venta ya fue facturada previamente.", ventaId);
                 if (venta.EstadoSri == "Rechazado")
                 {
-                    _logger.LogWarning("Corrigiendo inconsistencia: venta {VentaId} estaba en estado Rechazado, se actualiza a Autorizado.", ventaId);
                     venta.EstadoSri = "Autorizado";
                     await _context.SaveChangesAsync();
                 }
-
                 throw new Exception($"La venta {ventaId} ya fue facturada y autorizada previamente. No se puede facturar nuevamente.");
             }
 
-            // Caso 2: Clave en procesamiento (identificador 70) - reintentar el envío (POST)
             if (esClaveEnProcesamiento)
             {
                 _logger.LogInformation("Detectado CLAVE DE ACCESO EN PROCESAMIENTO (identificador 70) para la venta {VentaId}. Intento {Intento} de {MaxIntentos}.", ventaId, intento, MAX_INTENTOS_POST);
-
                 if (intento < MAX_INTENTOS_POST)
                 {
-                    _logger.LogInformation("Esperando {Espera} ms antes de reintentar el envío...", ESPERA_ENTRE_INTENTOS_MS);
                     await Task.Delay(ESPERA_ENTRE_INTENTOS_MS);
-                    // Reintentar el proceso completo (no se ha guardado nada en base de datos todavía)
                     await FacturarVentaConReintento(ventaId, intento + 1);
-                    return; // Importante: salir para no continuar con el flujo actual
+                    return;
                 }
                 else
                 {
-                    _logger.LogError("Se alcanzó el máximo de reintentos ({MaxIntentos}) para la venta {VentaId}. La venta quedará en estado Rechazado.", MAX_INTENTOS_POST, ventaId);
                     venta.EstadoSri = "Rechazado";
                     await _context.SaveChangesAsync();
-                    throw new Exception("El comprobante fue recibido pero no se pudo obtener la autorización después de varios intentos de envío. Por favor, consulte manualmente.");
+                    throw new Exception("El comprobante fue recibido pero no se pudo obtener la autorización después de varios intentos de envío.");
                 }
             }
 
-            // Si no es error 45 ni 70, continuar con el flujo normal (cuando la respuesta es RECIBIDA)
             if (respuestaRecepcion?.RespuestaRecepcionComprobante?.estado == "RECIBIDA")
             {
-                try
+                await Task.Delay(3000);
+                var respuestaAutorizacion = await _sriService.ConsultarAutorizacion(factura.InfoTributaria.claveAcceso);
+
+                bool autorizacionProcesada = false;
+                if (respuestaAutorizacion.RespuestaDeserializada?.RespuestaAutorizacionComprobante != null)
                 {
-                    await Task.Delay(3000);
-                    var respuestaAutorizacion = await _sriService.ConsultarAutorizacion(factura.InfoTributaria.claveAcceso);
-
-                    // --- Procesamiento con objeto deserializado ---
-                    bool autorizacionProcesada = false;
-                    if (respuestaAutorizacion.RespuestaDeserializada?.RespuestaAutorizacionComprobante != null)
+                    var comprobante = respuestaAutorizacion.RespuestaDeserializada.RespuestaAutorizacionComprobante;
+                    if (comprobante.autorizaciones != null && comprobante.autorizaciones.Length > 0)
                     {
-                        var comprobante = respuestaAutorizacion.RespuestaDeserializada.RespuestaAutorizacionComprobante;
-                        _logger.LogInformation("Respuesta deserializada: ClaveConsultada={Clave}, NumComprobantes={Num}, Autorizaciones.Length={Len}",
-                            comprobante.claveAccesoConsultada, comprobante.numeroComprobantes, comprobante.autorizaciones?.Length ?? 0);
-
-                        if (comprobante.autorizaciones != null && comprobante.autorizaciones.Length > 0)
-                        {
-                            var autorizacion = comprobante.autorizaciones[0];
-                            _logger.LogInformation("Autorización encontrada por deserialización: Estado={Estado}, Numero={Numero}",
-                                autorizacion.estado, autorizacion.numeroAutorizacion);
-
-                            await ProcesarAutorizacion(venta, autorizacion, xmlFirmado, factura.InfoTributaria.claveAcceso);
-                            autorizacionProcesada = true;
-                        }
-                    }
-
-                    // --- Si no se pudo por deserialización, intentar parseo manual del XML crudo ---
-                    if (!autorizacionProcesada)
-                    {
-                        _logger.LogWarning("No se pudo obtener autorización por deserialización. Intentando parseo manual del XML crudo.");
-
-                        string xmlParaParsear = respuestaAutorizacion.XmlRespuestaCruda;
-                        if (!string.IsNullOrEmpty(xmlParaParsear))
-                        {
-                            try
-                            {
-                                var doc = XDocument.Parse(xmlParaParsear);
-                                var authElement = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "autorizacion");
-
-                                if (authElement != null)
-                                {
-                                    var estado = (string)authElement.Element(XName.Get("estado"));
-                                    var numero = (string)authElement.Element(XName.Get("numeroAutorizacion"));
-                                    var fechaStr = (string)authElement.Element(XName.Get("fechaAutorizacion"));
-                                    var comprobanteXml = (string)authElement.Element(XName.Get("comprobante"));
-
-                                    _logger.LogInformation("Parseo manual exitoso: Estado={Estado}, Numero={Numero}", estado, numero);
-
-                                    await ProcesarAutorizacionManual(venta, estado, numero, fechaStr, comprobanteXml, xmlFirmado, factura.InfoTributaria.claveAcceso);
-                                    autorizacionProcesada = true;
-                                }
-                                else
-                                {
-                                    _logger.LogError("No se encontró elemento <autorizacion> en el XML crudo.");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, "Error al parsear manualmente el XML crudo de autorización.");
-                            }
-                        }
-                        else
-                        {
-                            _logger.LogError("No se pudo obtener el XML crudo para parseo manual.");
-                        }
-                    }
-
-                    if (!autorizacionProcesada)
-                    {
-                        venta.EstadoSri = "Rechazado";
-                        _logger.LogWarning("No se pudo obtener ninguna autorización para la clave {Clave}", factura.InfoTributaria.claveAcceso);
+                        var autorizacion = comprobante.autorizaciones[0];
+                        await ProcesarAutorizacion(venta, autorizacion, xmlFirmado, factura.InfoTributaria.claveAcceso);
+                        autorizacionProcesada = true;
                     }
                 }
-                catch (Exception ex)
+
+                if (!autorizacionProcesada)
                 {
-                    _logger.LogError(ex, "Error al consultar autorización para la clave {Clave}", factura.InfoTributaria.claveAcceso);
+                    _logger.LogWarning("No se pudo obtener autorización por deserialización. Intentando parseo manual del XML crudo.");
+                    string xmlParaParsear = respuestaAutorizacion.XmlRespuestaCruda;
+                    if (!string.IsNullOrEmpty(xmlParaParsear))
+                    {
+                        try
+                        {
+                            var doc = XDocument.Parse(xmlParaParsear);
+                            var authElement = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "autorizacion");
+                            if (authElement != null)
+                            {
+                                var estado = (string)authElement.Element(XName.Get("estado"));
+                                var numero = (string)authElement.Element(XName.Get("numeroAutorizacion"));
+                                var fechaStr = (string)authElement.Element(XName.Get("fechaAutorizacion"));
+                                var comprobanteXml = (string)authElement.Element(XName.Get("comprobante"));
+                                await ProcesarAutorizacionManual(venta, estado, numero, fechaStr, comprobanteXml, xmlFirmado, factura.InfoTributaria.claveAcceso);
+                                autorizacionProcesada = true;
+                            }
+                            else
+                            {
+                                _logger.LogError("No se encontró elemento <autorizacion> en el XML crudo.");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error al parsear manualmente el XML crudo de autorización.");
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogError("No se pudo obtener el XML crudo para parseo manual.");
+                    }
+                }
+
+                if (!autorizacionProcesada)
+                {
                     venta.EstadoSri = "Rechazado";
                 }
             }
-            else // estado != RECIBIDA (por ejemplo DEVUELTA con otro error)
+            else
             {
                 venta.EstadoSri = "Rechazado";
                 if (respuestaRecepcion?.RespuestaRecepcionComprobante?.comprobantes?.Length > 0)
@@ -378,7 +356,6 @@ namespace Infrastructure.Facturacion.Services
             _logger.LogInformation("Venta {VentaId} actualizada con estado {Estado}", ventaId, venta.EstadoSri);
         }
 
-        // Método auxiliar para procesar autorización obtenida por deserialización
         private async Task ProcesarAutorizacion(Venta venta, SriAutorizacion.autorizacion autorizacion, string xmlFirmado, string claveAccesoGenerada)
         {
             venta.EstadoSri = autorizacion.estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
@@ -387,25 +364,16 @@ namespace Infrastructure.Facturacion.Services
 
             if (!string.IsNullOrEmpty(autorizacion.comprobante))
             {
-                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                           $"{claveAccesoGenerada}.xml");
-                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                await File.WriteAllTextAsync(rutaXml, autorizacion.comprobante);
-                venta.SriAutorizacion = rutaXml;
-                _logger.LogInformation("XML autorizado guardado en {Ruta}", rutaXml);
+                venta.SriAutorizacion = autorizacion.comprobante;
+                _logger.LogInformation("XML autorizado guardado en base de datos (clave {Clave})", claveAccesoGenerada);
             }
             else
             {
                 _logger.LogWarning("El XML autorizado viene vacío, se guardará el firmado original.");
-                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                           $"{claveAccesoGenerada}.xml");
-                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                await File.WriteAllTextAsync(rutaXml, xmlFirmado);
-                venta.SriAutorizacion = rutaXml;
+                venta.SriAutorizacion = xmlFirmado;
             }
         }
 
-        // Método auxiliar para procesar autorización obtenida por parseo manual
         private async Task ProcesarAutorizacionManual(Venta venta, string estado, string numero, string fechaStr, string comprobanteXml, string xmlFirmado, string claveAccesoGenerada)
         {
             venta.EstadoSri = estado == "AUTORIZADO" ? "Autorizado" : "Rechazado";
@@ -417,21 +385,12 @@ namespace Infrastructure.Facturacion.Services
 
             if (!string.IsNullOrEmpty(comprobanteXml))
             {
-                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                           $"{claveAccesoGenerada}.xml");
-                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                await File.WriteAllTextAsync(rutaXml, comprobanteXml);
-                venta.SriAutorizacion = rutaXml;
-                _logger.LogInformation("XML autorizado guardado en {Ruta} (parseo manual)", rutaXml);
+                venta.SriAutorizacion = comprobanteXml;
+                _logger.LogInformation("XML autorizado guardado en base de datos (parseo manual) para clave {Clave}", claveAccesoGenerada);
             }
             else
             {
-                _logger.LogWarning("El XML autorizado (manual) viene vacío, se guardará el firmado original.");
-                var rutaXml = Path.Combine(_configuration["RutaXmlAutorizados"] ?? "XmlAutorizados",
-                                           $"{claveAccesoGenerada}.xml");
-                Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
-                await File.WriteAllTextAsync(rutaXml, xmlFirmado);
-                venta.SriAutorizacion = rutaXml;
+                venta.SriAutorizacion = xmlFirmado;
             }
         }
 

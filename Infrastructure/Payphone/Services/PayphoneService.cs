@@ -13,7 +13,6 @@ using Infrastructure.Reclamos.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Http;
 
 namespace Infrastructure.Payphone.Services
 {
@@ -57,30 +56,26 @@ namespace Infrastructure.Payphone.Services
             if (!cartItems.Any())
                 throw new Exception("El carrito está vacío");
 
-            // 2. Calcular totales (en centavos)
-            int totalAmount = 0;
-            int totalWithoutTax = 0;
-            int totalWithTax = 0;
-            int totalTax = 0;
+            // 2. Calcular totales usando la misma lógica que en facturación
+            decimal totalSinImpuestos = 0m;
+            decimal totalIva = 0m;
+            decimal totalConImpuestos = 0m;
 
             foreach (var item in cartItems)
             {
-                // Obtener producto para saber si tiene IVA (asumimos que todos los productos tienen 15% por ahora)
-                var producto = await _context.Productos.FindAsync(item.ProductoId);
-                if (producto == null)
-                    throw new Exception($"Producto {item.ProductoId} no encontrado");
-
-                // PrecioUnitario ya está en dólares, convertir a centavos
-                int precioCentavos = (int)(item.PrecioUnitario * 100);
-                int cantidad = item.Cantidad;
-
-                // Por simplicidad, todo el monto se considera con impuesto (amountWithTax)
-                // En un caso real podrías tener productos gravados y no gravados
-                totalWithTax += precioCentavos * cantidad;
-                totalTax += (int)((precioCentavos * cantidad) * 0.15m); // 15% de IVA
+                // Calcular IVA como en factura: PrecioUnitario * 15 / 115
+                var iva = Math.Round(item.PrecioUnitario * 15 / 115, 2);
+                var baseImponible = item.PrecioUnitario - iva;
+                totalSinImpuestos += baseImponible * item.Cantidad;
+                totalIva += iva * item.Cantidad;
+                totalConImpuestos += item.PrecioUnitario * item.Cantidad;
             }
 
-            totalAmount = totalWithTax + totalTax;
+            // Total en centavos (redondeo a entero)
+            int totalAmount = (int)Math.Round(totalConImpuestos * 100, MidpointRounding.AwayFromZero);
+            int totalWithoutTax = 0; // productos exentos
+            int totalWithTax = (int)Math.Round(totalSinImpuestos * 100, MidpointRounding.AwayFromZero);
+            int totalTax = (int)Math.Round(totalIva * 100, MidpointRounding.AwayFromZero);
 
             // 3. Generar clientTransactionId único (máx 15 caracteres)
             string clientTxId = Guid.NewGuid().ToString("N").Substring(0, 15).ToUpper();
@@ -90,7 +85,7 @@ namespace Infrastructure.Payphone.Services
             {
                 ClientTransactionId = clientTxId,
                 FkUsuario = usuarioId,
-                MontoTotal = totalAmount / 100m, // guardamos en dólares para referencia
+                MontoTotal = totalConImpuestos, // guardamos en dólares para referencia
                 DatosCarrito = JsonSerializer.Serialize(cartItems),
                 Estado = "Pendiente",
                 FechaCreacion = DateTime.Now
@@ -103,7 +98,7 @@ namespace Infrastructure.Payphone.Services
             {
                 ClientTransactionId = clientTxId,
                 Amount = totalAmount,
-                AmountWithoutTax = 0, // asumimos todo con impuesto
+                AmountWithoutTax = totalWithoutTax,
                 AmountWithTax = totalWithTax,
                 Tax = totalTax,
                 Token = _payphoneToken,
@@ -115,7 +110,6 @@ namespace Infrastructure.Payphone.Services
 
         public async Task<PayphoneConfirmResponse> ConfirmTransactionAsync(PayphoneConfirmRequest request, int usuarioId)
         {
-            // Usar una transacción de base de datos para asegurar atomicidad
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -188,7 +182,7 @@ namespace Infrastructure.Payphone.Services
                         throw new Exception($"Stock insuficiente para el producto {item.NombreProducto}");
                 }
 
-                // Crear venta
+                // Crear venta - usar el monto total correcto (precio con IVA)
                 var venta = new Venta
                 {
                     CodigoFactura = $"E-{DateTime.Now:yyyyMMddHHmmss}-{new Random().Next(1000, 9999)}",
@@ -197,7 +191,7 @@ namespace Infrastructure.Payphone.Services
                     TipoVenta = "Contado",
                     FechaCompra = DateTime.Now,
                     EstadoSri = "Pendiente",
-                    TotalCompra = pending.MontoTotal,
+                    TotalCompra = pending.MontoTotal, // ya es el precio con IVA
                     Observaciones = "Venta generada desde pago Payphone",
                     DireccionEntrega = "Por definir", // se podría pedir al usuario
                     TelefonoContacto = "", // se podría obtener del perfil
@@ -233,7 +227,7 @@ namespace Infrastructure.Payphone.Services
                             FkNumeroSerieProducto = serie.Id,
                             PrecioVenta = item.PrecioUnitario,
                             Descuento = 0,
-                            Iva = Math.Round(item.PrecioUnitario * 15 / 115, 2) // calculado con 15% de IVA incluido
+                            Iva = Math.Round(item.PrecioUnitario * 15 / 115, 2) // IVA incluido
                         };
                         _context.VentasPorNumeroSerieProductos.Add(ventaProducto);
                     }
@@ -263,19 +257,20 @@ namespace Infrastructure.Payphone.Services
 
                 await _context.SaveChangesAsync();
 
-                // Confirmar transacción de base de datos
-                await transaction.CommitAsync();
-
-                // 5. Facturar electrónicamente (fuera de la transacción para no bloquear)
+                // Ahora facturar electrónicamente (antes de commit)
                 try
                 {
                     await _facturacionService.FacturarVenta(venta.Id);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error al facturar la venta {VentaId} después del pago exitoso", venta.Id);
-                    // La venta ya está creada, pero la facturación falló. Se puede reintentar después.
+                    _logger.LogError(ex, "Error al facturar la venta {VentaId}", venta.Id);
+                    await transaction.RollbackAsync();
+                    throw new Exception("Error al generar la factura electrónica. El pago fue procesado pero no se pudo facturar. Contacte al administrador.", ex);
                 }
+
+                // Confirmar transacción de base de datos
+                await transaction.CommitAsync();
 
                 // Recargar venta para obtener datos actualizados (clave de acceso, etc.)
                 venta = await _context.Ventas.FindAsync(venta.Id);
@@ -290,7 +285,7 @@ namespace Infrastructure.Payphone.Services
                     AuthorizationCode = confirmResult.AuthorizationCode,
                     Message = confirmResult.Message,
                     VentaId = venta.Id,
-                    PdfUrl = $"/api/facturacion/pdf/{venta.Id}"
+                    PdfUrl = $"/api/factura/pdf/{venta.Id}"
                 };
             }
             catch (Exception)

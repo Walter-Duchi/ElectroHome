@@ -1749,4 +1749,55 @@ app.MapPut("/api/user/profile", [Authorize] async (UpdateProfileRequest request,
     }
 }).WithName("UpdateUserProfile");
 
+// ============================================
+// ENDPOINTS PARA FACTURAS DEL USUARIO
+// ==========================================
+
+app.MapGet("/api/factura/mis-facturas", [Authorize] async (HttpContext httpContext, ReclamosContext context) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var facturas = await context.Ventas
+        .Where(v => v.FkEmpresaCliente == usuarioId && v.EstadoSri == "Autorizado")
+        .OrderByDescending(v => v.FechaCompra)
+        .Select(v => new
+        {
+            v.Id,
+            v.CodigoFactura,
+            v.FechaCompra,
+            v.TotalCompra,
+            v.ClaveAcceso,
+            v.NumeroAutorizacion,
+            v.FechaAutorizacion
+        })
+        .ToListAsync();
+    return Results.Ok(facturas);
+}).WithName("GetMisFacturas");
+
+app.MapGet("/api/factura/html/{ventaId:int}", [Authorize] async (int ventaId, HttpContext httpContext, ReclamosContext context) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var venta = await context.Ventas
+        .Where(v => v.Id == ventaId && v.FkEmpresaCliente == usuarioId && v.EstadoSri == "Autorizado")
+        .Select(v => v.SriAutorizacion)
+        .FirstOrDefaultAsync();
+    if (string.IsNullOrEmpty(venta))
+        return Results.NotFound("Factura no encontrada o no autorizada");
+    var html = FacturaFormatter.GenerarHtmlDesdeXml(venta);
+    return Results.Content(html, "text/html");
+}).WithName("GetFacturaHtml");
+
+app.MapGet("/api/factura/pdf/{ventaId:int}", [Authorize] async (int ventaId, HttpContext httpContext, ReclamosContext context) =>
+{
+    var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var venta = await context.Ventas
+        .Where(v => v.Id == ventaId && v.FkEmpresaCliente == usuarioId && v.EstadoSri == "Autorizado")
+        .Select(v => new { v.SriAutorizacion, v.CodigoFactura })
+        .FirstOrDefaultAsync();
+    if (venta == null || string.IsNullOrEmpty(venta.SriAutorizacion))
+        return Results.NotFound("Factura no encontrada o no autorizada");
+
+    var pdfBytes = FacturaFormatter.GenerarPdfDesdeXml(venta.SriAutorizacion);
+    return Results.File(pdfBytes, "application/pdf", $"factura_{venta.CodigoFactura}.pdf");
+}).WithName("GetFacturaPdf");
+
 app.Run();

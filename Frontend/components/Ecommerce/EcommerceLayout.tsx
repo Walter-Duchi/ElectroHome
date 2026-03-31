@@ -21,6 +21,7 @@ import {
   alpha
 } from '@mui/material';
 import {
+  Receipt,
   ShoppingCart,
   AccountCircle,
   ExitToApp,
@@ -202,6 +203,10 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
                   <ListItemText>
                     {auth.user?.rol === 'Cliente' ? 'Mi Panel de Cliente' : 'Ir al Dashboard'}
                   </ListItemText>
+                </MenuItem>
+                <MenuItem component={Link} to="/mis-facturas" onClick={handleMenuClose}>
+                  <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
+                  <ListItemText>Ver mis facturas</ListItemText>
                 </MenuItem>
                 <Divider />
                 <MenuItem onClick={handleLogout}>

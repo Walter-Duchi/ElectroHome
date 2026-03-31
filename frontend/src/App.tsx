@@ -20,7 +20,9 @@ import PayphoneResponse from '../components/Payphone/PayphoneResponse';
 import InventarioDashboard from '../components/Inventario/InventarioDashboard';
 import ProductosDashboard from '../components/Productos/ProductosDashboard';
 import AnalistaDashboard from '../components/Analista/AnalistaDashboard';
-import Profile from '../components/Profile/Profile'; // <-- Importar componente
+import Profile from '../components/Profile/Profile';
+import MisFacturas from '../components/Factura/MisFacturas';
+import DetalleFactura from '../components/Factura/DetalleFactura';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -146,6 +148,20 @@ const AppContent: React.FC = () => {
         <Route path="/payphone-response" element={
           <ProtectedRoute>
             <PayphoneResponse />
+          </ProtectedRoute>
+        } />
+        <Route path="/mis-facturas" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <MisFacturas />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/mis-facturas/:ventaId" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DetalleFactura />
+            </DashboardLayout>
           </ProtectedRoute>
         } />
       </Routes>
