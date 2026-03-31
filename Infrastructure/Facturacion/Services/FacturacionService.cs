@@ -391,7 +391,7 @@ namespace Infrastructure.Facturacion.Services
                                            $"{claveAccesoGenerada}.xml");
                 Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
                 await File.WriteAllTextAsync(rutaXml, autorizacion.comprobante);
-                venta.XmlPath = rutaXml;
+                venta.SriAutorizacion = rutaXml;
                 _logger.LogInformation("XML autorizado guardado en {Ruta}", rutaXml);
             }
             else
@@ -401,7 +401,7 @@ namespace Infrastructure.Facturacion.Services
                                            $"{claveAccesoGenerada}.xml");
                 Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
                 await File.WriteAllTextAsync(rutaXml, xmlFirmado);
-                venta.XmlPath = rutaXml;
+                venta.SriAutorizacion = rutaXml;
             }
         }
 
@@ -421,7 +421,7 @@ namespace Infrastructure.Facturacion.Services
                                            $"{claveAccesoGenerada}.xml");
                 Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
                 await File.WriteAllTextAsync(rutaXml, comprobanteXml);
-                venta.XmlPath = rutaXml;
+                venta.SriAutorizacion = rutaXml;
                 _logger.LogInformation("XML autorizado guardado en {Ruta} (parseo manual)", rutaXml);
             }
             else
@@ -431,7 +431,7 @@ namespace Infrastructure.Facturacion.Services
                                            $"{claveAccesoGenerada}.xml");
                 Directory.CreateDirectory(Path.GetDirectoryName(rutaXml)!);
                 await File.WriteAllTextAsync(rutaXml, xmlFirmado);
-                venta.XmlPath = rutaXml;
+                venta.SriAutorizacion = rutaXml;
             }
         }
 

@@ -898,6 +898,7 @@ public partial class ReclamosContext : DbContext
                 .HasMaxLength(500)
                 .IsUnicode(false)
                 .HasColumnName("PDF_Path");
+            entity.Property(e => e.SriAutorizacion).HasColumnName("SRI_Autorizacion");
             entity.Property(e => e.TelefonoContacto)
                 .HasMaxLength(15)
                 .IsUnicode(false)
@@ -910,10 +911,6 @@ public partial class ReclamosContext : DbContext
             entity.Property(e => e.TotalCompra)
                 .HasColumnType("decimal(12, 2)")
                 .HasColumnName("Total_Compra");
-            entity.Property(e => e.XmlPath)
-                .HasMaxLength(500)
-                .IsUnicode(false)
-                .HasColumnName("XML_Path");
 
             entity.HasOne(d => d.CreadoPorNavigation).WithMany(p => p.VentaCreadoPorNavigations)
                 .HasForeignKey(d => d.CreadoPor)

@@ -25,7 +25,7 @@ public partial class Venta
 
     public DateTime? FechaAutorizacion { get; set; }
 
-    public string? XmlPath { get; set; }
+    public string? SriAutorizacion { get; set; }
 
     public string? PdfPath { get; set; }
 
