@@ -70,6 +70,8 @@ const MovimientosList: React.FC<MovimientosListProps> = ({ productos }) => {
           value={filtroDesde}
           onChange={(e) => setFiltroDesde(e.target.value)}
           InputLabelProps={{ shrink: true }}
+          onKeyDown={(e) => e.preventDefault()}
+          onPaste={(e) => e.preventDefault()}
         />
         <TextField
           label="Hasta"
@@ -77,6 +79,8 @@ const MovimientosList: React.FC<MovimientosListProps> = ({ productos }) => {
           value={filtroHasta}
           onChange={(e) => setFiltroHasta(e.target.value)}
           InputLabelProps={{ shrink: true }}
+          onKeyDown={(e) => e.preventDefault()}
+          onPaste={(e) => e.preventDefault()}
         />
       </Box>
 

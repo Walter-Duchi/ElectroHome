@@ -7,11 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Domain\Domain.csproj" />
+    <Compile Remove="DTOs\Facturacion\**" />
+    <EmbeddedResource Remove="DTOs\Facturacion\**" />
+    <None Remove="DTOs\Facturacion\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DTOs\Facturacion\" />
+    <ProjectReference Include="..\Domain\Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
