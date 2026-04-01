@@ -40,7 +40,6 @@ public class InventoryService : IInventoryService
 
     public async Task<UbicacionDto> CreateUbicacionAsync(CreateUbicacionRequest request, int usuarioId)
     {
-        // Validar código único
         if (await _context.InventarioUbicaciones.AnyAsync(u => u.Codigo == request.Codigo))
             throw new ArgumentException($"Ya existe una ubicación con el código {request.Codigo}");
 
@@ -67,7 +66,6 @@ public class InventoryService : IInventoryService
         if (ubicacion == null)
             throw new ArgumentException("Ubicación no encontrada");
 
-        // Validar código único si cambió
         if (ubicacion.Codigo != request.Codigo &&
             await _context.InventarioUbicaciones.AnyAsync(u => u.Codigo == request.Codigo && u.Id != request.Id))
             throw new ArgumentException($"Ya existe otra ubicación con el código {request.Codigo}");
@@ -95,7 +93,6 @@ public class InventoryService : IInventoryService
         if (ubicacion == null)
             return false;
 
-        // Verificar que no tenga hijos ni productos asignados
         if (ubicacion.InverseFkUbicacionPadreNavigation.Any() || ubicacion.NumeroSerieProductos.Any())
             throw new InvalidOperationException("No se puede eliminar una ubicación que tiene sub-ubicaciones o productos asignados.");
 
@@ -148,12 +145,10 @@ public class InventoryService : IInventoryService
 
     private async Task<MovimientoInventarioDto> RegistrarMovimiento(CreateMovimientoRequest request, string tipoMovimiento, int usuarioId)
     {
-        // Validar producto
         var producto = await _context.Productos.FindAsync(request.ProductoId);
         if (producto == null)
             throw new ArgumentException("Producto no encontrado");
 
-        // Calcular cantidad actual (suma de números de serie en estado 'Se_Puede_Vender')
         var cantidadActual = await _context.NumeroSerieProductos
             .CountAsync(ns => ns.FkProducto == request.ProductoId && ns.EstadoInventario == "Se_Puede_Vender");
 
@@ -167,9 +162,8 @@ public class InventoryService : IInventoryService
             nuevaCantidad = cantidadActual - request.Cantidad;
         }
         else // Ajuste
-            nuevaCantidad = request.Cantidad; // En ajuste, Cantidad es la nueva cantidad absoluta
+            nuevaCantidad = request.Cantidad;
 
-        // Crear movimiento
         var movimiento = new InventarioMovimiento
         {
             FkProducto = request.ProductoId,
@@ -186,12 +180,10 @@ public class InventoryService : IInventoryService
 
         _context.InventarioMovimientos.Add(movimiento);
 
-        // Si es entrada y se proporcionan números de serie, crearlos
         if ((tipoMovimiento == "Entrada" || tipoMovimiento == "Devolucion") && request.NumerosSerie != null)
         {
             foreach (var nsReq in request.NumerosSerie)
             {
-                // Validar número de serie único
                 if (await _context.NumeroSerieProductos.AnyAsync(ns => ns.NumeroSerie == nsReq.NumeroSerie))
                     throw new ArgumentException($"El número de serie {nsReq.NumeroSerie} ya existe");
 
@@ -208,12 +200,11 @@ public class InventoryService : IInventoryService
             }
         }
 
-        // Si es salida, marcar números de serie como vendidos (aquí simplificado, se podría elegir qué números específicos)
         if (tipoMovimiento == "Salida")
         {
             var numerosAVender = await _context.NumeroSerieProductos
                 .Where(ns => ns.FkProducto == request.ProductoId && ns.EstadoInventario == "Se_Puede_Vender")
-                .OrderBy(ns => ns.FechaIngreso) // FIFO
+                .OrderBy(ns => ns.FechaIngreso)
                 .Take(request.Cantidad)
                 .ToListAsync();
 
@@ -297,7 +288,6 @@ public class InventoryService : IInventoryService
 
     public async Task<ProveedorDto> CreateProveedorAsync(CreateProveedorRequest request, int usuarioId)
     {
-        // Validar RUC único
         if (await _context.Proveedores.AnyAsync(p => p.Ruc == request.Ruc))
             throw new ArgumentException($"Ya existe un proveedor con RUC {request.Ruc}");
 
@@ -328,7 +318,6 @@ public class InventoryService : IInventoryService
         if (proveedor == null)
             throw new ArgumentException("Proveedor no encontrado");
 
-        // Validar RUC único si cambió
         if (proveedor.Ruc != request.Ruc &&
             await _context.Proveedores.AnyAsync(p => p.Ruc == request.Ruc && p.Id != request.Id))
             throw new ArgumentException($"Ya existe otro proveedor con RUC {request.Ruc}");
@@ -359,6 +348,24 @@ public class InventoryService : IInventoryService
         return true;
     }
 
+    public async Task<bool> DeleteProveedorAsync(int id)
+    {
+        var proveedor = await _context.Proveedores
+            .Include(p => p.NumeroSerieProductos)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (proveedor == null)
+            return false;
+
+        // Verificar si el proveedor ha sido usado en algún producto (número de serie)
+        if (proveedor.NumeroSerieProductos.Any())
+            throw new InvalidOperationException("No se puede eliminar un proveedor que tiene productos asociados. Desactívelo en su lugar.");
+
+        _context.Proveedores.Remove(proveedor);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
     // ========== Mapeos privados ==========
     private UbicacionDto MapToUbicacionDto(InventarioUbicacione u)
     {
@@ -381,7 +388,7 @@ public class InventoryService : IInventoryService
         {
             Id = m.Id,
             ProductoId = m.FkProducto,
-            ProductoNombre = m.FkProductoNavigation?.Modelo ?? "", // CORREGIDO: usar Modelo en lugar de NombreCompleto
+            ProductoNombre = m.FkProductoNavigation?.Modelo ?? "",
             ProductoSku = m.FkProductoNavigation?.Sku ?? "",
             UsuarioId = m.FkUsuario,
             UsuarioNombre = m.FkUsuarioNavigation != null ? $"{m.FkUsuarioNavigation.Nombres} {m.FkUsuarioNavigation.Apellidos}" : "",
@@ -402,7 +409,7 @@ public class InventoryService : IInventoryService
         {
             Id = ns.Id,
             ProductoId = ns.FkProducto,
-            ProductoNombre = ns.FkProductoNavigation?.Modelo ?? "", // CORREGIDO: usar Modelo en lugar de NombreCompleto
+            ProductoNombre = ns.FkProductoNavigation?.Modelo ?? "",
             NumeroSerie = ns.NumeroSerie,
             EstadoInventario = ns.EstadoInventario,
             FechaIngreso = ns.FechaIngreso ?? DateTime.Now,

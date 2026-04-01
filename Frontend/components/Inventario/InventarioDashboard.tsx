@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Tabs, Tab, Paper, Button, Alert,
   CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, FormControlLabel, Switch
+  TextField, MenuItem, FormControlLabel, Switch, IconButton, Tooltip
 } from '@mui/material';
-import { Add, Refresh } from '@mui/icons-material';
+import { Add, Refresh, Delete } from '@mui/icons-material';
 import { inventarioService } from '../../services/inventarioService';
 import { productoManagementService } from '../../services/productoManagementService';
 import type { ProductoManagement } from '../../src/types/producto';
@@ -39,6 +39,7 @@ const InventarioDashboard: React.FC = () => {
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [productos, setProductos] = useState<ProductoManagement[]>([]);
+  const [mostrarInactivos, setMostrarInactivos] = useState(false); // Nuevo estado para filtro
 
   // Diálogo para nueva ubicación
   const [openUbicacionDialog, setOpenUbicacionDialog] = useState(false);
@@ -69,7 +70,7 @@ const InventarioDashboard: React.FC = () => {
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [mostrarInactivos]); // Recargar cuando cambia el filtro
 
   const cargarDatos = async () => {
     setLoading(true);
@@ -77,7 +78,7 @@ const InventarioDashboard: React.FC = () => {
     try {
       const [ubis, provs, prods] = await Promise.all([
         inventarioService.getUbicaciones(),
-        inventarioService.getProveedores(true),
+        inventarioService.getProveedores(!mostrarInactivos), // Si mostrarInactivos es true, traer todos (soloActivos=false)
         productoManagementService.getProductos(false)
       ]);
       setUbicaciones(ubis);
@@ -218,6 +219,22 @@ const InventarioDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteProveedor = async (id: number, nombre: string) => {
+    if (!confirm(`¿Eliminar el proveedor "${nombre}"? Esta acción solo es posible si no tiene productos asociados.`)) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await inventarioService.deleteProveedor(id);
+      setSuccess(`Proveedor "${nombre}" eliminado correctamente`);
+      cargarDatos();
+    } catch (err: any) {
+      const mensaje = err.response?.data?.message || 'Error al eliminar proveedor';
+      setError(mensaje);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container maxWidth="xl">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -277,21 +294,49 @@ const InventarioDashboard: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mostrarInactivos}
+                  onChange={(e) => setMostrarInactivos(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Mostrar inactivos"
+            />
             <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenProveedorDialog()}>
               Nuevo Proveedor
             </Button>
           </Box>
+
           {proveedores.map(p => (
             <Paper key={p.id} sx={{ p: 2, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
                 <Typography variant="subtitle1">{p.nombre}</Typography>
                 <Typography variant="body2" color="text.secondary">RUC: {p.ruc}</Typography>
+                {p.activo === false && (
+                  <Typography variant="caption" color="error">Inactivo</Typography>
+                )}
               </Box>
-              <Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button size="small" onClick={() => handleOpenProveedorDialog(p)}>Editar</Button>
+                <Tooltip title="Eliminar solo si no tiene productos asociados">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleDeleteProveedor(p.id, p.nombre)}
+                  >
+                    <Delete />
+                  </IconButton>
+                </Tooltip>
                 <FormControlLabel
-                  control={<Switch checked={p.activo} onChange={(e) => handleToggleProveedor(p.id, e.target.checked)} />}
+                  control={
+                    <Switch
+                      checked={p.activo}
+                      onChange={(e) => handleToggleProveedor(p.id, e.target.checked)}
+                    />
+                  }
                   label={p.activo ? 'Activo' : 'Inactivo'}
                 />
               </Box>

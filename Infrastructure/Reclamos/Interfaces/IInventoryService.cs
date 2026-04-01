@@ -29,4 +29,5 @@ public interface IInventoryService
     Task<ProveedorDto> CreateProveedorAsync(CreateProveedorRequest request, int usuarioId);
     Task<ProveedorDto> UpdateProveedorAsync(UpdateProveedorRequest request, int usuarioId);
     Task<bool> ToggleProveedorActivoAsync(int id, bool activo);
+    Task<bool> DeleteProveedorAsync(int id);
 }

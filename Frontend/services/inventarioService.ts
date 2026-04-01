@@ -104,5 +104,9 @@ export const inventarioService = {
 
     async toggleProveedorActivo(id: number, activo: boolean): Promise<void> {
         await api.patch(`/inventario/proveedores/${id}/toggle?activo=${activo}`);
+    },
+
+    async deleteProveedor(id: number): Promise<void> {
+        await api.delete(`/inventario/proveedores/${id}`);
     }
 };

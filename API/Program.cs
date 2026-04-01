@@ -1800,4 +1800,17 @@ app.MapGet("/api/factura/pdf/{ventaId:int}", [Authorize] async (int ventaId, Htt
     return Results.File(pdfBytes, "application/pdf", $"factura_{venta.CodigoFactura}.pdf");
 }).WithName("GetFacturaPdf");
 
+// Eliminar proveedor (solo si no tiene productos asociados)
+app.MapDelete("/api/inventario/proveedores/{id:int}", [Authorize(Roles = "Encargado_Inventario")] async (int id, IInventoryService service) =>
+{
+    try
+    {
+        var result = await service.DeleteProveedorAsync(id);
+        return result ? Results.Ok(new { message = "Proveedor eliminado correctamente" }) : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+});
 app.Run();
