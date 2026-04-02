@@ -96,7 +96,7 @@ public class ProductManagementService : IProductManagementService
         // Guardar imagen principal
         if (request.ImagenPrincipal != null)
         {
-            var imagenUrl = await GuardarImagen(request.ImagenPrincipal, producto.Id, webRootPath);
+            var imagenUrl = await GuardarImagen(request.ImagenPrincipal, producto.Id, true);
             producto.ImagenUrl = imagenUrl;
         }
 
@@ -105,7 +105,7 @@ public class ProductManagementService : IProductManagementService
         {
             foreach (var img in request.ImagenesAdicionales)
             {
-                var url = await GuardarImagen(img, producto.Id, webRootPath, false);
+                var url = await GuardarImagen(img, producto.Id, false);
                 _context.ProductoImagenes.Add(new ProductoImagene
                 {
                     FkProducto = producto.Id,
@@ -161,9 +161,9 @@ public class ProductManagementService : IProductManagementService
         if (request.ImagenPrincipal != null)
         {
             if (!string.IsNullOrEmpty(producto.ImagenUrl))
-                EliminarArchivo(producto.ImagenUrl, webRootPath);
+                EliminarArchivo(producto.ImagenUrl);
 
-            producto.ImagenUrl = await GuardarImagen(request.ImagenPrincipal, producto.Id, webRootPath);
+            producto.ImagenUrl = await GuardarImagen(request.ImagenPrincipal, producto.Id, true);
         }
 
         // Eliminar imágenes solicitadas
@@ -175,7 +175,7 @@ public class ProductManagementService : IProductManagementService
 
             foreach (var img in imagenesAEliminar)
             {
-                EliminarArchivo(img.UrlImagen, webRootPath);
+                EliminarArchivo(img.UrlImagen);
                 _context.ProductoImagenes.Remove(img);
             }
         }
@@ -185,7 +185,7 @@ public class ProductManagementService : IProductManagementService
         {
             foreach (var img in request.ImagenesAdicionales)
             {
-                var url = await GuardarImagen(img, producto.Id, webRootPath, false);
+                var url = await GuardarImagen(img, producto.Id, false);
                 _context.ProductoImagenes.Add(new ProductoImagene
                 {
                     FkProducto = producto.Id,
@@ -360,15 +360,23 @@ public class ProductManagementService : IProductManagementService
     }
 
     // ========== Métodos auxiliares ==========
-    private async Task<string> GuardarImagen(IFormFile archivo, int productoId, string webRootPath, bool esPrincipal = true)
+    private string GetFrontendImagesPath()
+    {
+        var baseDir = Directory.GetCurrentDirectory();
+        var frontendImagesPath = Path.GetFullPath(Path.Combine(baseDir, "..", "Frontend", "public", "img", "products"));
+        return frontendImagesPath;
+    }
+
+    private async Task<string> GuardarImagen(IFormFile archivo, int productoId, bool esPrincipal = true)
     {
         var extension = Path.GetExtension(archivo.FileName);
         var nombreArchivo = esPrincipal
             ? $"prod_{productoId}_principal{extension}"
             : $"prod_{productoId}_{Guid.NewGuid():N}{extension}";
 
-        var relativePath = Path.Combine("img", "products", nombreArchivo);
-        var fullPath = Path.Combine(webRootPath, relativePath);
+        var relativeUrl = $"/img/products/{nombreArchivo}";
+        var imagesPath = GetFrontendImagesPath();
+        var fullPath = Path.Combine(imagesPath, nombreArchivo);
 
         var directory = Path.GetDirectoryName(fullPath);
         if (!Directory.Exists(directory))
@@ -379,16 +387,17 @@ public class ProductManagementService : IProductManagementService
             await archivo.CopyToAsync(stream);
         }
 
-        return "/" + relativePath.Replace("\\", "/");
+        return relativeUrl;
     }
 
-    private void EliminarArchivo(string urlImagen, string webRootPath)
+    private void EliminarArchivo(string urlImagen)
     {
         if (string.IsNullOrEmpty(urlImagen))
             return;
 
-        var relativePath = urlImagen.TrimStart('/');
-        var fullPath = Path.Combine(webRootPath, relativePath);
+        var nombreArchivo = Path.GetFileName(urlImagen);
+        var imagesPath = GetFrontendImagesPath();
+        var fullPath = Path.Combine(imagesPath, nombreArchivo);
 
         if (File.Exists(fullPath))
             File.Delete(fullPath);
