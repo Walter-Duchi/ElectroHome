@@ -23,7 +23,8 @@ import {
   ShoppingCart,
   Store,
   Assignment,
-  Receipt
+  Receipt,
+  Dashboard
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
 import CreateUserModal from '../Navbar/CreateUserModal';
@@ -61,7 +62,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     return userRole === 'Administrador';
   };
 
-  const isInApp = location.pathname.startsWith('/app');
   const getDashboardTitle = () => {
     switch (userRole) {
       case 'Administrador':
@@ -156,6 +156,14 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           },
         }}
       >
+        {userRole !== 'Cliente' && (
+          <MenuItem onClick={() => { handleMenuClose(); navigate('/app'); }}>
+            <ListItemIcon>
+              <Dashboard fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Área Propia</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={() => { handleMenuClose(); navigate('/app/perfil'); }}>
           <ListItemIcon>
             <AccountCircle fontSize="small" />

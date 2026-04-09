@@ -48,7 +48,7 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
   onCategoryChange,
   selectedCategory
 }) => {
-  const { auth, logout } = useAuth();
+  const { auth, logout, userRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -107,7 +107,6 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
     if (onCategoryChange) onCategoryChange(categoryId);
   };
 
-  const isInApp = location.pathname.startsWith('/app');
   const nombreCompleto = auth.user?.nombres && auth.user?.apellidos
     ? `${auth.user.nombres} ${auth.user.apellidos}`
     : auth.user?.correo?.split('@')[0] || 'Usuario';
@@ -179,7 +178,7 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
                     {nombreCompleto}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {auth.user?.rol}
+                    {userRole}
                   </Typography>
                 </Box>
                 <IconButton color="inherit" edge="end">
@@ -192,10 +191,12 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
                 onClose={handleMenuClose}
                 PaperProps={{ sx: { mt: 1.5, minWidth: 200 } }}
               >
-                <MenuItem component={Link} to={isInApp ? "/" : "/app"} onClick={handleMenuClose}>
-                  <ListItemIcon><Dashboard fontSize="small" /></ListItemIcon>
-                  <ListItemText>{isInApp ? "Volver al Ecommerce" : "Área Propia"}</ListItemText>
-                </MenuItem>
+                {userRole !== 'Cliente' && (
+                  <MenuItem component={Link} to="/app" onClick={handleMenuClose}>
+                    <ListItemIcon><Dashboard fontSize="small" /></ListItemIcon>
+                    <ListItemText>Área Propia</ListItemText>
+                  </MenuItem>
+                )}
                 <MenuItem component={Link} to="/app/reclamos" onClick={handleMenuClose}>
                   <ListItemIcon><Assignment fontSize="small" /></ListItemIcon>
                   <ListItemText>Manejar Reclamos</ListItemText>
