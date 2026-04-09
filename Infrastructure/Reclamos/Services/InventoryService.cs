@@ -11,11 +11,13 @@ public class InventoryService : IInventoryService
 {
     private readonly ReclamosContext _context;
     private readonly ILogger<InventoryService> _logger;
+    private readonly ICartService _cartService;
 
-    public InventoryService(ReclamosContext context, ILogger<InventoryService> logger)
+    public InventoryService(ReclamosContext context, ILogger<InventoryService> logger, ICartService cartService)
     {
         _context = context;
         _logger = logger;
+        _cartService = cartService;
     }
 
     // ========== Ubicaciones ==========
@@ -130,7 +132,56 @@ public class InventoryService : IInventoryService
 
     public async Task<MovimientoInventarioDto> RegistrarSalidaAsync(CreateMovimientoRequest request, int usuarioId)
     {
-        return await RegistrarMovimiento(request, "Salida", usuarioId);
+        var producto = await _context.Productos.FindAsync(request.ProductoId);
+        if (producto == null)
+            throw new ArgumentException("Producto no encontrado");
+
+        var cantidadActual = await _context.NumeroSerieProductos
+            .CountAsync(ns => ns.FkProducto == request.ProductoId && ns.EstadoInventario == "Se_Puede_Vender");
+
+        if (cantidadActual < request.Cantidad)
+            throw new InvalidOperationException("Stock insuficiente");
+
+        int nuevaCantidad = cantidadActual - request.Cantidad;
+
+        var movimiento = new InventarioMovimiento
+        {
+            FkProducto = request.ProductoId,
+            FkUsuario = usuarioId,
+            TipoMovimiento = "Salida",
+            Cantidad = request.Cantidad,
+            CantidadAnterior = cantidadActual,
+            CantidadNueva = nuevaCantidad,
+            Motivo = request.Motivo,
+            Referencia = request.Referencia,
+            CostoUnitario = request.CostoUnitario,
+            FechaMovimiento = DateTime.Now
+        };
+
+        _context.InventarioMovimientos.Add(movimiento);
+
+        var numerosAVender = await _context.NumeroSerieProductos
+            .Where(ns => ns.FkProducto == request.ProductoId && ns.EstadoInventario == "Se_Puede_Vender")
+            .OrderBy(ns => ns.FechaIngreso)
+            .Take(request.Cantidad)
+            .ToListAsync();
+
+        foreach (var ns in numerosAVender)
+        {
+            ns.EstadoInventario = "Vendido";
+        }
+
+        await _context.SaveChangesAsync();
+
+        if (nuevaCantidad == 0)
+        {
+            await _cartService.RemoveProductFromAllCartsAsync(request.ProductoId);
+        }
+
+        _logger.LogInformation("Usuario {UsuarioId} registró salida de {Cantidad} unidades del producto {ProductoId}",
+            usuarioId, request.Cantidad, request.ProductoId);
+
+        return MapToMovimientoDto(movimiento);
     }
 
     public async Task<MovimientoInventarioDto> RegistrarAjusteAsync(CreateMovimientoRequest request, int usuarioId)

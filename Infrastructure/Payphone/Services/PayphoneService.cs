@@ -85,7 +85,7 @@ namespace Infrastructure.Payphone.Services
             {
                 ClientTransactionId = clientTxId,
                 FkUsuario = usuarioId,
-                MontoTotal = totalConImpuestos, // guardamos en dólares para referencia
+                MontoTotal = totalConImpuestos,
                 DatosCarrito = JsonSerializer.Serialize(cartItems),
                 Estado = "Pendiente",
                 FechaCreacion = DateTime.Now
@@ -171,7 +171,7 @@ namespace Infrastructure.Payphone.Services
                 if (cartItems == null)
                     throw new Exception("No se pudieron recuperar los items del carrito");
 
-                // Verificar stock nuevamente (pudo haber cambiado) - ahora contando solo los números de serie que no están en ninguna venta
+                // Verificar stock nuevamente (pudo haber cambiado)
                 foreach (var item in cartItems)
                 {
                     var stock = await _context.NumeroSerieProductos
@@ -182,19 +182,19 @@ namespace Infrastructure.Payphone.Services
                         throw new Exception($"Stock insuficiente para el producto {item.NombreProducto}");
                 }
 
-                // Crear venta - usar el monto total correcto (precio con IVA)
+                // Crear venta
                 var venta = new Venta
                 {
                     CodigoFactura = $"E-{DateTime.Now:yyyyMMddHHmmss}-{new Random().Next(1000, 9999)}",
                     FkEmpresaCliente = usuarioId,
-                    FkVendedor = null, // compra online
+                    FkVendedor = null,
                     TipoVenta = "Contado",
                     FechaCompra = DateTime.Now,
                     EstadoSri = "Pendiente",
-                    TotalCompra = pending.MontoTotal, // ya es el precio con IVA
+                    TotalCompra = pending.MontoTotal,
                     Observaciones = "Venta generada desde pago Payphone",
-                    DireccionEntrega = "Por definir", // se podría pedir al usuario
-                    TelefonoContacto = "", // se podría obtener del perfil
+                    DireccionEntrega = "Por definir",
+                    TelefonoContacto = "",
                     CreadoPor = usuarioId
                 };
                 _context.Ventas.Add(venta);
@@ -203,20 +203,16 @@ namespace Infrastructure.Payphone.Services
                 // Asignar números de serie a los productos
                 foreach (var item in cartItems)
                 {
-                    // Obtener la cantidad requerida de números de serie disponibles que no estén ya en ventas
                     var seriesDisponibles = await _context.NumeroSerieProductos
                         .Where(n => n.FkProducto == item.ProductoId
                             && n.EstadoInventario == "Se_Puede_Vender"
                             && !_context.VentasPorNumeroSerieProductos.Any(v => v.FkNumeroSerieProducto == n.Id))
-                        .OrderBy(n => n.Id) // Asegurar orden para evitar deadlocks
+                        .OrderBy(n => n.Id)
                         .Take(item.Cantidad)
                         .ToListAsync();
 
                     if (seriesDisponibles.Count < item.Cantidad)
-                    {
-                        // Esto no debería ocurrir porque ya verificamos stock, pero por si acaso
                         throw new Exception($"No hay suficientes unidades disponibles para {item.NombreProducto}");
-                    }
 
                     foreach (var serie in seriesDisponibles)
                     {
@@ -227,7 +223,7 @@ namespace Infrastructure.Payphone.Services
                             FkNumeroSerieProducto = serie.Id,
                             PrecioVenta = item.PrecioUnitario,
                             Descuento = 0,
-                            Iva = Math.Round(item.PrecioUnitario * 15 / 115, 2) // IVA incluido
+                            Iva = Math.Round(item.PrecioUnitario * 15 / 115, 2)
                         };
                         _context.VentasPorNumeroSerieProductos.Add(ventaProducto);
                     }
@@ -257,7 +253,7 @@ namespace Infrastructure.Payphone.Services
 
                 await _context.SaveChangesAsync();
 
-                // Ahora facturar electrónicamente (antes de commit)
+                // Ahora facturar electrónicamente (dentro de la transacción)
                 try
                 {
                     await _facturacionService.FacturarVenta(venta.Id);
@@ -271,6 +267,9 @@ namespace Infrastructure.Payphone.Services
 
                 // Confirmar transacción de base de datos
                 await transaction.CommitAsync();
+
+                // Una vez que todo es exitoso, vaciar el carrito del usuario
+                await _cartService.ClearCartAsync(usuarioId);
 
                 // Recargar venta para obtener datos actualizados (clave de acceso, etc.)
                 venta = await _context.Ventas.FindAsync(venta.Id);

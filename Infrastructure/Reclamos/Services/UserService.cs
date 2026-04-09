@@ -1,10 +1,11 @@
-﻿using Application.DTOs.Reclamos.User;
+﻿using Application.DTOs.Auth;
+using Application.DTOs.Reclamos.User;
+using Application.DTOs.User;
 using Infrastructure.Data;
 using Infrastructure.Models;
 using Infrastructure.Reclamos.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
-using Application.DTOs.User;
 using System.Text;
 
 namespace Infrastructure.Reclamos.Services
@@ -18,31 +19,24 @@ namespace Infrastructure.Reclamos.Services
             _context = context;
         }
 
-        public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, int creadoPorId)
+        public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest request, int? creadoPorId)
         {
-            // Validar que el correo no exista
             if (await _context.Usuarios.AnyAsync(u => u.Correo == request.Correo))
                 throw new ArgumentException("El correo ya está registrado");
 
-            // Validar que la identificación no exista
             if (await _context.Usuarios.AnyAsync(u => u.Identificacion == request.Identificacion))
                 throw new ArgumentException("La identificación ya está registrada");
 
-            // Validar RUC si se proporciona
             if (!string.IsNullOrEmpty(request.RUC) && await _context.Usuarios.AnyAsync(u => u.Ruc == request.RUC))
                 throw new ArgumentException("El RUC ya está registrado");
 
-            // Validar cédula ecuatoriana si el tipo es Cédula
             if (request.TipoIdentificacion == "Cedula" && !ValidarCedulaEcuatoriana(request.Identificacion))
                 throw new ArgumentException("La cédula ecuatoriana no es válida");
 
-            // Generar contraseña aleatoria segura
             var contrasenaGenerada = GenerarContrasenaSegura();
 
-            // Hashear la contraseña
             var contrasenaHash = HashPassword(contrasenaGenerada);
 
-            // Crear el usuario
             var usuario = new Usuario
             {
                 Nombres = request.Nombres,
@@ -87,6 +81,71 @@ namespace Infrastructure.Reclamos.Services
             };
         }
 
+        public async Task<CreateUserResponse> RegisterClientAsync(RegisterRequest request)
+        {
+            // Validar que el correo no exista
+            if (await _context.Usuarios.AnyAsync(u => u.Correo == request.Correo))
+                throw new ArgumentException("El correo ya está registrado");
+
+            // Validar que la identificación no exista
+            if (await _context.Usuarios.AnyAsync(u => u.Identificacion == request.Identificacion))
+                throw new ArgumentException("La identificación ya está registrada");
+
+            // Validar RUC si se proporciona
+            if (!string.IsNullOrEmpty(request.Ruc) && await _context.Usuarios.AnyAsync(u => u.Ruc == request.Ruc))
+                throw new ArgumentException("El RUC ya está registrado");
+
+            // Validar cédula ecuatoriana si el tipo es Cédula
+            if (request.TipoIdentificacion == "Cedula" && !ValidarCedulaEcuatoriana(request.Identificacion))
+                throw new ArgumentException("La cédula ecuatoriana no es válida");
+
+            // Hashear la contraseña proporcionada
+            var contrasenaHash = HashPassword(request.Contrasena);
+
+            var usuario = new Usuario
+            {
+                Nombres = request.Nombres,
+                Apellidos = request.Apellidos,
+                RazonSocial = null,
+                TipoIdentificacion = request.TipoIdentificacion,
+                Identificacion = request.Identificacion,
+                Ruc = request.Ruc,
+                Correo = request.Correo,
+                Contrasena = contrasenaHash,
+                Celular = request.Celular,
+                Convencional = request.Convencional,
+                Pais = "Ecuador",
+                DivisionAdministrativa = "Guayas",
+                Ciudad = request.Ciudad,
+                CodigoPostal = request.CodigoPostal,
+                Direccion = request.Direccion,
+                Rol = "Cliente",
+                FechaCreacion = DateTime.UtcNow,
+                NumCuentaBancaria = "0000000000",
+                TipoCuentaBancaria = "Ahorro",
+                Activo = true,
+                ContribuyenteEspecial = false,
+                ObligadoContabilidad = false,
+                CreadoPor = null
+            };
+
+            _context.Usuarios.Add(usuario);
+            await _context.SaveChangesAsync();
+
+            return new CreateUserResponse
+            {
+                Id = usuario.Id,
+                Nombres = usuario.Nombres,
+                Apellidos = usuario.Apellidos,
+                Correo = usuario.Correo,
+                Celular = usuario.Celular,
+                Rol = usuario.Rol,
+                FechaCreacion = usuario.FechaCreacion,
+                ContrasenaGenerada = request.Contrasena,
+                Mensaje = "Cliente registrado exitosamente"
+            };
+        }
+
         private bool ValidarCedulaEcuatoriana(string cedula)
         {
             if (cedula.Length != 10 || !cedula.All(char.IsDigit))
@@ -121,19 +180,16 @@ namespace Infrastructure.Reclamos.Services
             var random = new Random();
             var passwordChars = new char[12];
 
-            // Asegurar al menos un carácter de cada tipo
             passwordChars[0] = mayusculas[random.Next(mayusculas.Length)];
             passwordChars[1] = minusculas[random.Next(minusculas.Length)];
             passwordChars[2] = numeros[random.Next(numeros.Length)];
             passwordChars[3] = especiales[random.Next(especiales.Length)];
 
-            // Completar el resto de la contraseña
             for (int i = 4; i < 12; i++)
             {
                 passwordChars[i] = todosCaracteres[random.Next(todosCaracteres.Length)];
             }
 
-            // Mezclar los caracteres
             for (int i = 0; i < 12; i++)
             {
                 int randomIndex = random.Next(i, 12);
@@ -151,21 +207,18 @@ namespace Infrastructure.Reclamos.Services
 
         public Task<bool> CanCreateRole(string creatorRole, string targetRole)
         {
-            // Solo el administrador puede crear usuarios
             if (creatorRole != "Administrador")
                 return Task.FromResult(false);
 
-            // Roles que el administrador puede crear
             var rolesPermitidos = new List<string>
             {
-                "Revisor", "Tecnico", "Personal de Entrega", "Vendedor",
+                "Revisor", "Tecnico", "Personal de Entrega",
                 "Analista_Datos", "Encargado_Inventario", "Gestor_Productos", "Administrador"
             };
 
             return Task.FromResult(rolesPermitidos.Contains(targetRole));
         }
 
-        // Nuevos métodos
         public async Task<ProfileResponse> GetProfileAsync(int userId)
         {
             var usuario = await _context.Usuarios.FindAsync(userId);
@@ -205,22 +258,18 @@ namespace Infrastructure.Reclamos.Services
             if (usuario == null)
                 throw new ArgumentException("Usuario no encontrado");
 
-            // Validar y actualizar correo
             if (!string.IsNullOrEmpty(request.Correo) && request.Correo != usuario.Correo)
             {
-                // Verificar que no exista otro usuario con ese correo
                 var existe = await _context.Usuarios.AnyAsync(u => u.Correo == request.Correo && u.Id != userId);
                 if (existe)
                     throw new ArgumentException("El correo ya está registrado por otro usuario");
 
-                // Validar formato de correo
                 if (!IsValidEmail(request.Correo))
                     throw new ArgumentException("Formato de correo inválido");
 
                 usuario.Correo = request.Correo;
             }
 
-            // Actualizar celular
             if (!string.IsNullOrEmpty(request.Celular))
             {
                 if (!IsValidCelular(request.Celular))
@@ -228,14 +277,11 @@ namespace Infrastructure.Reclamos.Services
                 usuario.Celular = request.Celular;
             }
 
-            // Actualizar convencional (opcional)
             usuario.Convencional = string.IsNullOrEmpty(request.Convencional) ? null : request.Convencional;
 
-            // Actualizar ciudad
             if (!string.IsNullOrEmpty(request.Ciudad))
                 usuario.Ciudad = request.Ciudad;
 
-            // Actualizar código postal
             if (!string.IsNullOrEmpty(request.CodigoPostal))
             {
                 if (!IsValidPostalCode(request.CodigoPostal))
@@ -243,11 +289,9 @@ namespace Infrastructure.Reclamos.Services
                 usuario.CodigoPostal = request.CodigoPostal;
             }
 
-            // Actualizar dirección
             if (!string.IsNullOrEmpty(request.Direccion))
                 usuario.Direccion = request.Direccion;
 
-            // Cambio de contraseña
             if (!string.IsNullOrEmpty(request.NewPassword) || !string.IsNullOrEmpty(request.CurrentPassword))
             {
                 if (string.IsNullOrEmpty(request.CurrentPassword))
@@ -259,16 +303,13 @@ namespace Infrastructure.Reclamos.Services
                 if (request.NewPassword != request.ConfirmNewPassword)
                     throw new ArgumentException("Las nuevas contraseñas no coinciden");
 
-                // Verificar contraseña actual
                 var currentHash = HashPassword(request.CurrentPassword);
                 if (!currentHash.SequenceEqual(usuario.Contrasena))
                     throw new ArgumentException("La contraseña actual es incorrecta");
 
-                // Validar longitud mínima
                 if (request.NewPassword.Length < 6)
                     throw new ArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
 
-                // Actualizar contraseña
                 usuario.Contrasena = HashPassword(request.NewPassword);
             }
 
@@ -276,7 +317,6 @@ namespace Infrastructure.Reclamos.Services
             return true;
         }
 
-        // Métodos auxiliares privados
         private bool IsValidEmail(string email)
         {
             try

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -18,18 +18,12 @@ import {
 import {
   Menu as MenuIcon,
   AccountCircle,
-  Settings,
   ExitToApp,
   Add,
-  Engineering,
-  LocalShipping,
-  Assignment,
-  Receipt,
-  Analytics,
-  Inventory,
   ShoppingCart,
   Store,
-  ShowChart,
+  Assignment,
+  Receipt
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
 import CreateUserModal from '../Navbar/CreateUserModal';
@@ -41,11 +35,11 @@ interface DashboardLayoutProps {
 
 function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { auth, logout, userRole } = useAuth();
 
-  // Obtener nombre completo del usuario
   const nombreCompleto = auth.user?.nombres && auth.user?.apellidos
     ? `${auth.user.nombres} ${auth.user.apellidos}`
     : auth.user?.correo?.split('@')[0] || 'Usuario';
@@ -67,6 +61,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     return userRole === 'Administrador';
   };
 
+  const isInApp = location.pathname.startsWith('/app');
   const getDashboardTitle = () => {
     switch (userRole) {
       case 'Administrador':
@@ -77,8 +72,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
         return 'Panel Técnico';
       case 'Personal de Entrega':
         return 'Panel de Entregas';
-      case 'Vendedor':
-        return 'Panel de Ventas';
       case 'Analista_Datos':
         return 'Panel de Análisis';
       case 'Encargado_Inventario':
@@ -109,7 +102,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             {getDashboardTitle()}
           </Typography>
 
-          {/* Botón para ir a la tienda */}
           <Tooltip title="Ir a la tienda">
             <Button
               color="inherit"
@@ -135,103 +127,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             </Tooltip>
           )}
 
-          {userRole === 'Tecnico' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Engineering />}
-              onClick={() => navigate('/app/tecnico')}
-              sx={{ mr: 2 }}
-            >
-              Mis Revisiones
-            </Button>
-          )}
-
-          {userRole === 'Revisor' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Receipt />}
-              onClick={() => navigate('/app/reclamo')}
-              sx={{ mr: 2 }}
-            >
-              Crear Reclamo
-            </Button>
-          )}
-
-          {userRole === 'Cliente' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Assignment />}
-              onClick={() => navigate('/app/mis-reclamos')}
-              sx={{ mr: 2 }}
-            >
-              Mis Reclamos
-            </Button>
-          )}
-
-          {userRole === 'Personal de Entrega' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<LocalShipping />}
-              onClick={() => navigate('/app/entrega')}
-              sx={{ mr: 2 }}
-            >
-              Procesar Entregas
-            </Button>
-          )}
-
-          {userRole === 'Vendedor' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<ShoppingCart />}
-              onClick={() => navigate('/app/ventas')}
-              sx={{ mr: 2 }}
-            >
-              Ventas
-            </Button>
-          )}
-
-          {userRole === 'Analista_Datos' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Analytics />}
-              onClick={() => navigate('/app/analisis')}
-              sx={{ mr: 2 }}
-            >
-              Análisis
-            </Button>
-          )}
-
-          {userRole === 'Encargado_Inventario' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Inventory />}
-              onClick={() => navigate('/app/inventario')}
-              sx={{ mr: 2 }}
-            >
-              Inventario
-            </Button>
-          )}
-
-          {userRole === 'Analista_Datos' && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<ShowChart />}
-              onClick={() => navigate('/app/analista')}
-              sx={{ mr: 2 }}
-            >
-              Dashboard
-            </Button>
-          )}
-
-          {/* Área clickeable: nombre, rol e icono */}
           <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={handleMenuOpen}>
             <Box sx={{ textAlign: 'right', mr: 1 }}>
               <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
@@ -267,23 +162,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           </ListItemIcon>
           <ListItemText>Mi Perfil</ListItemText>
         </MenuItem>
-
-        <ThemeSelector variant="menu-item" />
-
+        <MenuItem onClick={() => { handleMenuClose(); navigate('/app/reclamos'); }}>
+          <ListItemIcon><Assignment fontSize="small" /></ListItemIcon>
+          <ListItemText>Manejar Reclamos</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => { handleMenuClose(); navigate('/mis-facturas'); }}>
           <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
           <ListItemText>Mis Facturas</ListItemText>
         </MenuItem>
-
-        <MenuItem onClick={handleMenuClose}>
-          <ListItemIcon>
-            <Settings fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Configuración</ListItemText>
-        </MenuItem>
-
+        <ThemeSelector variant="menu-item" />
         <Divider />
-
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>
             <ExitToApp fontSize="small" />

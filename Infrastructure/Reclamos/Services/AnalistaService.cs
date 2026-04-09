@@ -27,7 +27,6 @@ public class AnalistaService : IAnalistaService
         var hace30DiasAnterior = hace30Dias.AddDays(-30);
         var inicioMes = new DateTime(hoy.Year, hoy.Month, 1);
 
-        // Ventas con todas las relaciones necesarias
         var ventas = await _context.Ventas
             .Where(v => v.FechaCompra >= hace30Dias && v.FechaCompra <= hoy && v.EstadoSri == "Autorizado")
             .Include(v => v.VentasPorNumeroSerieProductos)
@@ -44,7 +43,6 @@ public class AnalistaService : IAnalistaService
             .Where(v => v.FechaCompra >= hace30DiasAnterior && v.FechaCompra < hace30Dias && v.EstadoSri == "Autorizado")
             .ToListAsync();
 
-        // Ventas diarias
         var ventasDiarias = ventas
             .Where(v => v.FechaCompra.HasValue)
             .GroupBy(v => v.FechaCompra!.Value.Date)
@@ -57,7 +55,6 @@ public class AnalistaService : IAnalistaService
             .OrderBy(v => v.Fecha)
             .ToList();
 
-        // Productos más vendidos (manejar nulos)
         var productosVendidos = ventas
             .SelectMany(v => v.VentasPorNumeroSerieProductos ?? new List<VentasPorNumeroSerieProducto>())
             .Where(vp => vp.FkNumeroSerieProductoNavigation?.FkProductoNavigation != null)
@@ -74,7 +71,6 @@ public class AnalistaService : IAnalistaService
             .Take(10)
             .ToList();
 
-        // Ventas por categoría (manejar nulos)
         var ventasPorCategoria = ventas
             .SelectMany(v => v.VentasPorNumeroSerieProductos ?? new List<VentasPorNumeroSerieProducto>())
             .Where(vp => vp.FkNumeroSerieProductoNavigation?.FkProductoNavigation != null)
@@ -94,7 +90,6 @@ public class AnalistaService : IAnalistaService
             cat.PorcentajeVentas = totalIngresos > 0 ? (cat.IngresoGenerado / totalIngresos) * 100 : 0;
         }
 
-        // Reclamos
         var reclamos = await _context.ReclamosProductoSns
             .Where(r => r.FechaReclamoClienteFinal >= hace30Dias)
             .ToListAsync();
@@ -109,7 +104,6 @@ public class AnalistaService : IAnalistaService
             })
             .ToList();
 
-        // Inventario
         var productosConStock = await _context.NumeroSerieProductos
             .Where(ns => ns.EstadoInventario == "Se_Puede_Vender")
             .GroupBy(ns => ns.FkProducto)
@@ -119,7 +113,6 @@ public class AnalistaService : IAnalistaService
         var totalProductos = productosConStock.Count;
         var stockDisponible = productosConStock.Sum(p => p.Stock);
 
-        // Obtener nombres de productos para bajo stock (evita múltiples consultas)
         var productosIds = productosConStock.Select(p => p.ProductoId).ToList();
         var productosInfo = await _context.Productos
             .Where(p => productosIds.Contains(p.Id))
@@ -136,7 +129,6 @@ public class AnalistaService : IAnalistaService
             })
             .ToList();
 
-        // Usuarios
         var usuarios = await _context.Usuarios
             .Where(u => u.Activo == true)
             .ToListAsync();
@@ -153,7 +145,6 @@ public class AnalistaService : IAnalistaService
         var nuevosUltimoMes = await _context.Usuarios
             .CountAsync(u => u.FechaCreacion >= inicioMes);
 
-        // Resumen
         var totalProductosVendidos = productosVendidos.Sum(p => p.UnidadesVendidas);
         var reclamosPendientes = reclamos.Count(r => r.Estado == "Pendiente" || r.Estado == "En Revision");
 
@@ -168,7 +159,6 @@ public class AnalistaService : IAnalistaService
             UsuariosActivos = usuarios.Count
         };
 
-        // Variación
         var ingresosPeriodoActual = totalIngresos;
         var ingresosPeriodoAnterior = ventasAnteriores.Sum(v => v.TotalCompra);
         var variacion = ingresosPeriodoAnterior > 0

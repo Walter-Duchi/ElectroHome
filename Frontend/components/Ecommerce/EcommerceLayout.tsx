@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/immutability */
 import React, { useState, useEffect } from 'react';
 import {
   AppBar,
@@ -26,17 +25,15 @@ import {
   AccountCircle,
   ExitToApp,
   Dashboard,
-  Brightness4,
-  Brightness7,
-  SettingsBrightness,
-  Search as SearchIcon
+  PersonAdd,
+  Assignment
 } from '@mui/icons-material';
 import { useAuth } from '../../services/authContext';
-import { useTheme as useCustomTheme } from '../../src/context/ThemeContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { cartService } from '../../services/cartService';
 import { categoryService } from '../../services/categoryService';
 import { Category } from '../../src/types/ecommerce';
+import { ThemeSelector } from '../ThemeSelector/ThemeSelector';
 
 interface EcommerceLayoutProps {
   children: React.ReactNode;
@@ -52,8 +49,8 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
   selectedCategory
 }) => {
   const { auth, logout } = useAuth();
-  const { mode, toggleMode } = useCustomTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -110,10 +107,10 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
     if (onCategoryChange) onCategoryChange(categoryId);
   };
 
-  const getThemeIcon = () => {
-    if (mode === 'auto') return <SettingsBrightness />;
-    return mode === 'light' ? <Brightness7 /> : <Brightness4 />;
-  };
+  const isInApp = location.pathname.startsWith('/app');
+  const nombreCompleto = auth.user?.nombres && auth.user?.apellidos
+    ? `${auth.user.nombres} ${auth.user.apellidos}`
+    : auth.user?.correo?.split('@')[0] || 'Usuario';
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -128,7 +125,6 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
             ElectroHome
           </Typography>
 
-          {/* Category Selector */}
           <FormControl size="small" sx={{ minWidth: 200, mr: 2 }}>
             <Select
               displayEmpty
@@ -143,7 +139,6 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
             </Select>
           </FormControl>
 
-          {/* Search Bar */}
           <Box component="form" onSubmit={handleSearchSubmit} sx={{ flexGrow: 1, mr: 2 }}>
             <Box sx={{
               position: 'relative',
@@ -153,7 +148,6 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
               width: '100%'
             }}>
               <Box sx={{ padding: theme.spacing(0, 2), height: '100%', position: 'absolute', pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <SearchIcon />
               </Box>
               <InputBase
                 placeholder="Buscar productos…"
@@ -169,45 +163,52 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
             </Box>
           </Box>
 
-          {/* Cart Icon */}
-          <IconButton color="inherit" component={Link} to="/cart" sx={{ mr: 1 }}>
-            <Badge badgeContent={cartCount} color="secondary">
-              <ShoppingCart />
-            </Badge>
-          </IconButton>
+          {auth.isAuthenticated && (
+            <IconButton color="inherit" component={Link} to="/cart" sx={{ mr: 1 }}>
+              <Badge badgeContent={cartCount} color="secondary">
+                <ShoppingCart />
+              </Badge>
+            </IconButton>
+          )}
 
-          {/* Theme Toggle */}
-          <IconButton color="inherit" onClick={toggleMode} sx={{ mr: 1 }}>
-            {getThemeIcon()}
-          </IconButton>
-
-          {/* User Menu */}
           {auth.isAuthenticated ? (
             <>
-              <IconButton color="inherit" onClick={handleMenuOpen}>
-                <AccountCircle />
-              </IconButton>
+              <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={handleMenuOpen}>
+                <Box sx={{ textAlign: 'right', mr: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
+                    {nombreCompleto}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {auth.user?.rol}
+                  </Typography>
+                </Box>
+                <IconButton color="inherit" edge="end">
+                  <AccountCircle />
+                </IconButton>
+              </Box>
               <Menu
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
                 PaperProps={{ sx: { mt: 1.5, minWidth: 200 } }}
               >
-                <MenuItem component={Link} to="/cart" onClick={handleMenuClose}>
-                  <ListItemIcon><ShoppingCart fontSize="small" /></ListItemIcon>
-                  <ListItemText>Mi Carrito</ListItemText>
-                </MenuItem>
-                {/* Siempre mostrar acceso al dashboard para usuarios autenticados */}
-                <MenuItem component={Link} to="/app" onClick={handleMenuClose}>
+                <MenuItem component={Link} to={isInApp ? "/" : "/app"} onClick={handleMenuClose}>
                   <ListItemIcon><Dashboard fontSize="small" /></ListItemIcon>
-                  <ListItemText>
-                    {auth.user?.rol === 'Cliente' ? 'Mi Panel de Cliente' : 'Ir al Dashboard'}
-                  </ListItemText>
+                  <ListItemText>{isInApp ? "Volver al Ecommerce" : "Área Propia"}</ListItemText>
+                </MenuItem>
+                <MenuItem component={Link} to="/app/reclamos" onClick={handleMenuClose}>
+                  <ListItemIcon><Assignment fontSize="small" /></ListItemIcon>
+                  <ListItemText>Manejar Reclamos</ListItemText>
+                </MenuItem>
+                <MenuItem component={Link} to="/app/perfil" onClick={handleMenuClose}>
+                  <ListItemIcon><AccountCircle fontSize="small" /></ListItemIcon>
+                  <ListItemText>Mi Perfil</ListItemText>
                 </MenuItem>
                 <MenuItem component={Link} to="/mis-facturas" onClick={handleMenuClose}>
                   <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
                   <ListItemText>Ver mis facturas</ListItemText>
                 </MenuItem>
+                <ThemeSelector variant="menu-item" />
                 <Divider />
                 <MenuItem onClick={handleLogout}>
                   <ListItemIcon><ExitToApp fontSize="small" /></ListItemIcon>
@@ -216,9 +217,14 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
               </Menu>
             </>
           ) : (
-            <Button color="inherit" component={Link} to="/login">
-              Iniciar sesión
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button color="inherit" component={Link} to="/register">
+                Registrarse
+              </Button>
+              <Button color="inherit" component={Link} to="/login">
+                Iniciar sesión
+              </Button>
+            </Box>
           )}
         </Toolbar>
       </AppBar>

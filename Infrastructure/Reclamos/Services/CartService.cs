@@ -56,30 +56,30 @@ namespace Infrastructure.Reclamos.Services
         {
             try
             {
-                // Verificar que el producto existe y está activo
                 var producto = await _context.Productos
                     .FirstOrDefaultAsync(p => p.Id == request.ProductoId && p.Activo == true);
                 if (producto == null)
                     return false;
 
-                // Verificar stock disponible
                 var stock = await _context.NumeroSerieProductos
                     .CountAsync(nsp => nsp.FkProducto == request.ProductoId && nsp.EstadoInventario == "Se_Puede_Vender");
                 if (stock < request.Cantidad)
                     return false;
 
-                // Buscar si ya existe el producto en el carrito
                 var existingItem = await _context.CarritoCompras
                     .FirstOrDefaultAsync(c => c.FkCliente == usuarioId && c.FkProducto == request.ProductoId);
 
                 if (existingItem != null)
                 {
-                    // Actualizar cantidad
-                    existingItem.Cantidad += request.Cantidad;
+                    int nuevaCantidad = existingItem.Cantidad + request.Cantidad;
+                    if (stock < nuevaCantidad)
+                        return false;
+                    existingItem.Cantidad = nuevaCantidad;
                 }
                 else
                 {
-                    // Crear nuevo item
+                    if (request.Cantidad > stock)
+                        return false;
                     var newItem = new CarritoCompra
                     {
                         FkCliente = usuarioId,
@@ -115,7 +115,6 @@ namespace Infrastructure.Reclamos.Services
                 }
                 else
                 {
-                    // Verificar stock
                     var stock = await _context.NumeroSerieProductos
                         .CountAsync(nsp => nsp.FkProducto == productoId && nsp.EstadoInventario == "Se_Puede_Vender");
                     if (stock < nuevaCantidad)
@@ -169,6 +168,27 @@ namespace Infrastructure.Reclamos.Services
             {
                 _logger.LogError(ex, "Error al limpiar carrito del usuario {UsuarioId}", usuarioId);
                 return false;
+            }
+        }
+
+        public async Task RemoveProductFromAllCartsAsync(int productoId)
+        {
+            try
+            {
+                var items = await _context.CarritoCompras
+                    .Where(c => c.FkProducto == productoId)
+                    .ToListAsync();
+                if (items.Any())
+                {
+                    _context.CarritoCompras.RemoveRange(items);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Se eliminó el producto {ProductoId} del carrito de {Cantidad} usuarios", productoId, items.Count);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al eliminar producto {ProductoId} de todos los carritos", productoId);
+                throw;
             }
         }
     }

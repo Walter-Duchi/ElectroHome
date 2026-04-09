@@ -34,27 +34,22 @@ namespace Infrastructure.Reclamos.Services
 
         public async Task<LoginResponse> AuthenticateAsync(LoginRequest request)
         {
-            // Buscar usuario por correo
             var usuario = await _context.Usuarios
                 .FirstOrDefaultAsync(u => u.Correo == request.Correo);
 
             if (usuario == null)
                 throw new UnauthorizedAccessException("Credenciales incorrectas");
 
-            // Verificar si el usuario está activo
             if (!usuario.Activo)
                 throw new UnauthorizedAccessException("Cuenta desactivada o eliminada");
 
-            // Calcular hash SHA256 de la contraseña proporcionada
             using var sha256 = SHA256.Create();
             var inputBytes = Encoding.UTF8.GetBytes(request.Contrasena);
             var hashBytes = sha256.ComputeHash(inputBytes);
 
-            // Comparar con el hash almacenado en la base de datos
             if (!hashBytes.SequenceEqual(usuario.Contrasena))
                 throw new UnauthorizedAccessException("Credenciales incorrectas");
 
-            // Generar token JWT
             var token = _jwtTokenGenerator.GenerateToken(
                 usuario.Id,
                 usuario.Correo,
@@ -67,7 +62,7 @@ namespace Infrastructure.Reclamos.Services
                 Id = usuario.Id,
                 Correo = usuario.Correo,
                 Rol = usuario.Rol,
-                Nombres =  usuario.Nombres,
+                Nombres = usuario.Nombres,
                 Apellidos = usuario.Apellidos
             };
         }
@@ -78,12 +73,10 @@ namespace Infrastructure.Reclamos.Services
             {
                 _logger.LogInformation($"Iniciando solicitud de restablecimiento para: {correo}");
 
-                // Buscar usuario por correo
                 var usuario = await _context.Usuarios
                     .AsNoTracking()
                     .FirstOrDefaultAsync(u => u.Correo == correo);
 
-                // Por seguridad, siempre retornamos éxito aunque el correo no exista
                 if (usuario == null)
                 {
                     _logger.LogWarning($"Correo no encontrado: {correo} (se retorna éxito por seguridad)");
@@ -92,11 +85,9 @@ namespace Infrastructure.Reclamos.Services
 
                 _logger.LogInformation($"Usuario encontrado: {usuario.Nombres} {usuario.Apellidos}");
 
-                // Generar token único
                 var token = GenerateSecureToken();
                 _logger.LogDebug($"Token generado: {token.Substring(0, 10)}...");
 
-                // Invalidar cualquier token previo del usuario
                 await _context.TokensDeAccesos
                     .Where(t => t.FkUsuario == usuario.Id &&
                                t.TipoToken == "ResetPassword" &&
@@ -104,7 +95,6 @@ namespace Infrastructure.Reclamos.Services
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(t => t.Vigente, false));
 
-                // Crear nuevo token
                 var passwordResetToken = new TokensDeAcceso
                 {
                     Token = token,
@@ -120,13 +110,11 @@ namespace Infrastructure.Reclamos.Services
 
                 _logger.LogInformation($"Token guardado en BD para usuario ID: {usuario.Id}");
 
-                // Generar enlace de restablecimiento
                 var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
                 var resetLink = $"{frontendUrl}/reset-password?token={Uri.EscapeDataString(token)}";
 
                 _logger.LogInformation($"Enlace generado: {resetLink}");
 
-                // Enviar correo
                 var emailResult = await _emailService.SendPasswordResetEmailAsync(
                     usuario.Correo,
                     resetLink,
@@ -175,7 +163,6 @@ namespace Infrastructure.Reclamos.Services
                     return false;
                 }
 
-                // Verificar si el token ha expirado
                 if (tokenEntity.FechaExpiracion < DateTime.UtcNow)
                 {
                     _logger.LogWarning($"Token expirado (expiración: {tokenEntity.FechaExpiracion})");
@@ -220,22 +207,18 @@ namespace Infrastructure.Reclamos.Services
                     return false;
                 }
 
-                // Validar fuerza de la contraseña
                 if (!IsStrongPassword(nuevaContrasena))
                 {
                     _logger.LogWarning("Contraseña no cumple con los requisitos de seguridad");
                     throw new ArgumentException("La contraseña no cumple con los requisitos de seguridad");
                 }
 
-                // Calcular hash SHA256 de la nueva contraseña
                 using var sha256 = SHA256.Create();
                 var inputBytes = Encoding.UTF8.GetBytes(nuevaContrasena);
                 var hashBytes = sha256.ComputeHash(inputBytes);
 
-                // Actualizar contraseña del usuario
                 tokenEntity.FkUsuarioNavigation.Contrasena = hashBytes;
 
-                // Marcar token como usado
                 tokenEntity.Vigente = false;
 
                 await _context.SaveChangesAsync();
@@ -245,7 +228,7 @@ namespace Infrastructure.Reclamos.Services
             }
             catch (ArgumentException)
             {
-                throw; // Re-lanzar validación de contraseña
+                throw;
             }
             catch (Exception ex)
             {
@@ -260,7 +243,6 @@ namespace Infrastructure.Reclamos.Services
             var tokenBytes = new byte[32];
             rng.GetBytes(tokenBytes);
 
-            // Convertir a Base64 URL-safe
             return Convert.ToBase64String(tokenBytes)
                 .Replace('+', '-')
                 .Replace('/', '_')

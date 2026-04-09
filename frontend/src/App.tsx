@@ -10,7 +10,7 @@ import CrearReclamo from '../components/Reclamo/CrearReclamo';
 import TecnicoDashboard from '../components/Tecnico/TecnicoDashboard';
 import RevisarProducto from '../components/Tecnico/RevisarProducto';
 import EntregaDashboard from '../components/Entrega/EntregaDashboard';
-import ClienteDashboard from '../components/Cliente/ClienteDashboard';
+import ReclamosDashboard from '../components/Reclamo/ReclamosDashboard';
 import DatosEmpresaConfig from '../components/Admin/DatosEmpresaConfig';
 import EcommerceHome from '../components/Ecommerce/EcommerceHome';
 import Cart from '../components/Ecommerce/Cart';
@@ -23,6 +23,7 @@ import AnalistaDashboard from '../components/Analista/AnalistaDashboard';
 import Profile from '../components/Profile/Profile';
 import MisFacturas from '../components/Factura/MisFacturas';
 import DetalleFactura from '../components/Factura/DetalleFactura';
+import RegisterForm from '../components/Auth/RegisterForm';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -43,13 +44,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   return <>{children}</>;
 };
 
-// Componente que decide qué dashboard mostrar dentro de /app según el rol
 const DashboardRouter: React.FC = () => {
   const { auth } = useAuth();
 
   switch (auth.user?.rol) {
     case 'Cliente':
-      return <ClienteDashboard />;
+      return <ReclamosDashboard />;
     case 'Revisor':
       return <CrearReclamo />;
     case 'Tecnico':
@@ -102,9 +102,9 @@ const AppContent: React.FC = () => {
   return (
     <Router>
       <Routes>
-        {/* Rutas públicas */}
         <Route path="/" element={<EcommerceHome />} />
         <Route path="/login" element={<LoginForm />} />
+        <Route path="/register" element={<RegisterForm />} />
         <Route path="/forgot-password" element={<ForgotPasswordForm />} />
         <Route path="/reset-password" element={<ResetPasswordForm />} />
         <Route path="/producto/:id" element={<ProductDetail />} />
@@ -114,7 +114,6 @@ const AppContent: React.FC = () => {
           </ProtectedRoute>
         } />
 
-        {/* Rutas protegidas del dashboard (bajo /app) */}
         <Route path="/app" element={
           <ProtectedRoute>
             <DashboardLayout>
@@ -129,6 +128,13 @@ const AppContent: React.FC = () => {
             </DashboardLayout>
           </ProtectedRoute>
         } />
+        <Route path="/app/reclamos" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <ReclamosDashboard />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
         <Route path="/app/tecnico/revisar/:id" element={
           <ProtectedRoute allowedRoles={['Tecnico']}>
             <DashboardLayout>
@@ -137,7 +143,6 @@ const AppContent: React.FC = () => {
           </ProtectedRoute>
         } />
 
-        {/* Ruta por defecto */}
         <Route path="*" element={<Navigate to="/" replace />} />
 
         <Route path="/checkout" element={

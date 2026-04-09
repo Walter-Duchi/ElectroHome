@@ -9,5 +9,6 @@ namespace Infrastructure.Reclamos.Interfaces
         Task<bool> UpdateCartItemQuantityAsync(int usuarioId, int productoId, int nuevaCantidad);
         Task<bool> RemoveFromCartAsync(int usuarioId, int productoId);
         Task<bool> ClearCartAsync(int usuarioId);
+        Task RemoveProductFromAllCartsAsync(int productoId);
     }
 }

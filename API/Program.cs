@@ -30,10 +30,8 @@ using System.Xml.Linq;
 using Yamgooo.SRI.Sign;
 using Yamgooo.SRI.Sign.Extensions;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de logging EXTENDIDO
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
@@ -41,8 +39,6 @@ builder.Logging.AddEventSourceLogger();
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
 QuestPDF.Settings.License = LicenseType.Community;
 
-
-// Aumentar verbosidad para todo
 builder.Services.AddLogging(logging =>
 {
     logging.AddConsole();
@@ -50,7 +46,6 @@ builder.Services.AddLogging(logging =>
     logging.SetMinimumLevel(LogLevel.Trace);
 });
 
-// Habilitar logs detallados de Entity Framework
 builder.Services.AddDbContext<ReclamosContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -80,7 +75,6 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 
-    // Agregar logging para JWT
     options.Events = new JwtBearerEvents
     {
         OnAuthenticationFailed = context =>
@@ -98,7 +92,6 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Servicios
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -122,7 +115,6 @@ builder.Services.AddScoped<IAnalistaService, AnalistaService>();
 builder.Services.AddSriSignService(builder.Configuration, "SriSign");
 builder.Services.AddHttpClient();
 
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
@@ -139,7 +131,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
-// Middleware para logging de todas las peticiones
 app.Use(async (context, next) =>
 {
     var logger = app.Logger;
@@ -179,7 +170,6 @@ if (app.Environment.IsDevelopment())
             var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
             logger.LogError(ex, "EXCEPCIÓN NO MANEJADA: {Message}", ex.Message);
 
-            // Log detallado
             logger.LogError("Stack Trace: {StackTrace}", ex.StackTrace);
             logger.LogError("Inner Exception: {InnerException}", ex.InnerException?.Message);
 
@@ -192,7 +182,6 @@ app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Servir archivos estáticos desde la carpeta Documents
 var documentsPath = Path.Combine(Directory.GetCurrentDirectory(), "Documents");
 if (!Directory.Exists(documentsPath))
 {
@@ -203,14 +192,12 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(documentsPath),
     RequestPath = "/Documents",
-    ServeUnknownFileTypes = true, // Para servir archivos PDF
+    ServeUnknownFileTypes = true,
     DefaultContentType = "application/octet-stream"
 });
 
-// También servir archivos desde wwwroot si los hay
 app.UseStaticFiles();
 
-// Configurar MIME types para archivos comunes
 var provider = new FileExtensionContentTypeProvider();
 provider.Mappings[".pdf"] = "application/pdf";
 provider.Mappings[".txt"] = "text/plain";
@@ -223,14 +210,12 @@ app.UseStaticFiles(new StaticFileOptions
     ContentTypeProvider = provider
 });
 
-// Asegurar que la carpeta 'entrega' existe
 var entregaPath = Path.Combine(documentsPath, "entrega");
 if (!Directory.Exists(entregaPath))
 {
     Directory.CreateDirectory(entregaPath);
 }
 
-// Middleware para logging de rutas disponibles (solo desarrollo)
 if (app.Environment.IsDevelopment())
 {
     app.Map("/debug/routes", endpoints =>
@@ -256,9 +241,6 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// ============================================
-// ENDPOINTS DE AUTENTICACIÓN
-// ============================================
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService, ILogger<Program> logger) =>
 {
     logger.LogInformation("Intento de login para: {Correo}", request.Correo);
@@ -371,12 +353,35 @@ app.MapPost("/api/auth/reset-password", async (ResetPasswordRequest request, IAu
 })
 .AllowAnonymous();
 
-//CREAR USUARIO COMO ADMINISTRADOR
+app.MapPost("/api/auth/register", async (RegisterRequest request, HttpContext httpContext, ILogger<Program> logger) =>
+{
+    try
+    {
+        if (string.IsNullOrWhiteSpace(request.Nombres) || string.IsNullOrWhiteSpace(request.Apellidos))
+            return Results.BadRequest(new { message = "Nombres y apellidos son requeridos" });
+
+        var userService = httpContext.RequestServices.GetRequiredService<IUserService>();
+        var response = await userService.RegisterClientAsync(request);
+        return Results.Ok(new { message = "Cliente registrado exitosamente", userId = response.Id });
+    }
+    catch (ArgumentException ex)
+    {
+        logger.LogWarning(ex, "Error de validación en registro");
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error en registro de cliente");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+})
+.AllowAnonymous();
+
 app.MapGet("/api/admin/roles-permitidos", [Authorize(Roles = "Administrador")] () =>
 {
     var rolesPermitidos = new List<string>
     {
-        "Revisor", "Tecnico", "Personal de Entrega", "Vendedor",
+        "Revisor", "Tecnico", "Personal de Entrega",
         "Analista_Datos", "Encargado_Inventario", "Gestor_Productos", "Administrador"
     };
 
@@ -395,11 +400,9 @@ app.MapPost("/api/admin/crear-usuario", [Authorize(Roles = "Administrador")] asy
         logger.LogInformation("=== INICIO: Crear Usuario (Administrador) ===");
         logger.LogInformation($"Solicitud: {System.Text.Json.JsonSerializer.Serialize(request)}");
 
-        // Obtener ID del administrador que crea el usuario
         var administradorId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
         logger.LogInformation($"Administrador ID: {administradorId} creando usuario");
 
-        // Crear el usuario
         var response = await userService.CreateUserAsync(request, administradorId);
 
         logger.LogInformation("=== ÉXITO: Usuario creado ===");
@@ -420,7 +423,6 @@ app.MapPost("/api/admin/crear-usuario", [Authorize(Roles = "Administrador")] asy
     }
 });
 
-// Endpoints para reclamos
 app.MapPost("/api/reclamos/validar-cliente", [Authorize(Roles = "Revisor")] async (ValidarClienteRequest request, IReclamoService reclamoService) =>
 {
     var response = await reclamoService.ValidarClienteAsync(request.Ruc);
@@ -440,11 +442,6 @@ app.MapPost("/api/reclamos/crear", [Authorize(Roles = "Revisor")] async (CrearRe
     return response.Exito ? Results.Ok(response) : Results.BadRequest(response);
 });
 
-// ============================================
-// ENDPOINTS PARA TÉCNICO - CON LOGGING DETALLADO
-// ============================================
-
-// Obtener productos asignados al técnico
 app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -453,7 +450,6 @@ app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpC
     {
         logger.LogInformation("=== INICIO ENDPOINT /api/tecnico/productos ===");
 
-        // Obtener ID del técnico del token
         var user = httpContext.User;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var userRole = user.FindFirst(ClaimTypes.Role)?.Value;
@@ -496,7 +492,6 @@ app.MapGet("/api/tecnico/productos", [Authorize(Roles = "Tecnico")] async (HttpC
     }
 }).WithName("GetTecnicoProductos");
 
-// Obtener próximo producto a revisar
 app.MapGet("/api/tecnico/proximo-producto", [Authorize(Roles = "Tecnico")] async (HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -529,7 +524,6 @@ app.MapGet("/api/tecnico/proximo-producto", [Authorize(Roles = "Tecnico")] async
     }
 }).WithName("GetProximoProducto");
 
-// Validar si un producto está en el orden correcto para revisar
 app.MapGet("/api/tecnico/validar-orden/{id}", [Authorize(Roles = "Tecnico")] async (int id, HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -553,7 +547,6 @@ app.MapGet("/api/tecnico/validar-orden/{id}", [Authorize(Roles = "Tecnico")] asy
     }
 }).WithName("ValidarOrdenRevision");
 
-// Iniciar revisión de un producto
 app.MapPost("/api/tecnico/iniciar-revision", [Authorize(Roles = "Tecnico")] async (IniciarRevisionRequest request, HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -587,7 +580,6 @@ app.MapPost("/api/tecnico/iniciar-revision", [Authorize(Roles = "Tecnico")] asyn
     }
 }).WithName("IniciarRevision");
 
-// Finalizar revisión de un producto
 app.MapPost("/api/tecnico/finalizar-revision", [Authorize(Roles = "Tecnico")] async (FinalizarRevisionRequest request, HttpContext httpContext, ITecnicoService tecnicoService) =>
 {
     var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -603,7 +595,6 @@ app.MapPost("/api/tecnico/finalizar-revision", [Authorize(Roles = "Tecnico")] as
         logger.LogInformation("Técnico ID: {TecnicoId} finalizando revisión de producto ID: {ProductoId}",
             tecnicoId, request.ReclamoProductoSnId);
 
-        // Validaciones adicionales
         if (request.Estado != "Aprobado" && request.Estado != "Rechazado")
         {
             logger.LogWarning("Estado inválido: {Estado}", request.Estado);
@@ -635,9 +626,6 @@ app.MapPost("/api/tecnico/finalizar-revision", [Authorize(Roles = "Tecnico")] as
     }
 }).WithName("FinalizarRevision");
 
-// ============================================
-// ENDPOINT PARA DEBUG - Ver todas las rutas
-// ============================================
 app.MapGet("/debug/endpoints", (IEnumerable<EndpointDataSource> endpointSources) =>
 {
     var endpoints = endpointSources.SelectMany(es => es.Endpoints);
@@ -659,18 +647,15 @@ app.MapGet("/debug/endpoints", (IEnumerable<EndpointDataSource> endpointSources)
     return Results.Ok(result);
 }).AllowAnonymous();
 
-// Endpoint diagnóstico DB
 app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> logger) =>
 {
     try
     {
         logger.LogInformation("=== DIAGNÓSTICO DEL SISTEMA ===");
 
-        // Verificar conexión a BD
         var canConnect = await context.Database.CanConnectAsync();
         logger.LogInformation("Conexión a BD: {CanConnect}", canConnect);
 
-        // Contar registros en tablas clave
         var tecnicosCount = await context.Usuarios.CountAsync(u => u.Rol == "Tecnico");
         var productosCount = await context.ReclamosProductoSns.CountAsync();
         var productosConTecnico = await context.ReclamosProductoSns
@@ -681,13 +666,11 @@ app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> 
         logger.LogInformation("Total productos en reclamos: {ProductosCount}", productosCount);
         logger.LogInformation("Productos con técnico asignado: {ConTecnico}", productosConTecnico);
 
-        // Listar técnicos
         var tecnicos = await context.Usuarios
             .Where(u => u.Rol == "Tecnico")
             .Select(u => new { u.Id, u.Nombres, u.Apellidos, u.Correo })
             .ToListAsync();
 
-        // Listar productos asignados
         var productosAsignados = await context.ReclamosProductoSns
             .Include(rps => rps.FkTecnicoAsignadoNavigation)
             .Where(rps => rps.FkTecnicoAsignado != null)
@@ -726,11 +709,6 @@ app.MapGet("/api/diagnostico", async (ReclamosContext context, ILogger<Program> 
     }
 }).AllowAnonymous();
 
-// ============================================
-// ENDPOINTS PARA PERSONAL DE ENTREGA (ACTUALIZADOS)
-// ============================================
-
-// Buscar reclamo para entrega
 app.MapPost("/api/entrega/buscar-reclamo", [Authorize(Roles = "Personal de Entrega")] async (
     BuscarReclamoRequest request,
     IEntregaService entregaService,
@@ -751,7 +729,6 @@ app.MapPost("/api/entrega/buscar-reclamo", [Authorize(Roles = "Personal de Entre
     }
 });
 
-// Validar producto de reemplazo
 app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
     ValidarReemplazoRequest request,
     IEntregaService entregaService,
@@ -774,7 +751,6 @@ app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de En
     }
 });
 
-// Seleccionar producto de reemplazo
 app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
     SeleccionarReemplazoRequest request,
     IEntregaService entregaService,
@@ -807,7 +783,6 @@ app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal d
     }
 });
 
-// Verificar si todos los productos tienen reemplazo
 app.MapGet("/api/entrega/verificar-reemplazos/{codigoReclamo}", [Authorize(Roles = "Personal de Entrega")] async (
     string codigoReclamo,
     IEntregaService entregaService,
@@ -828,7 +803,6 @@ app.MapGet("/api/entrega/verificar-reemplazos/{codigoReclamo}", [Authorize(Roles
     }
 });
 
-// Generar datos para comprobante
 app.MapPost("/api/entrega/generar-datos-comprobante", [Authorize(Roles = "Personal de Entrega")] async (
     GenerarComprobanteRequest request,
     IEntregaService entregaService,
@@ -851,7 +825,6 @@ app.MapPost("/api/entrega/generar-datos-comprobante", [Authorize(Roles = "Person
     }
 });
 
-// Generar PDF de comprobante
 app.MapPost("/api/entrega/generar-pdf-comprobante", [Authorize(Roles = "Personal de Entrega")] async (
     ComprobanteEntregaDTO comprobante,
     IEntregaService entregaService,
@@ -873,7 +846,6 @@ app.MapPost("/api/entrega/generar-pdf-comprobante", [Authorize(Roles = "Personal
     }
 });
 
-// Subir comprobante firmado
 app.MapPost("/api/entrega/subir-comprobante", [Authorize(Roles = "Personal de Entrega")] async (
     SubirComprobanteRequest request,
     IEntregaService entregaService,
@@ -898,7 +870,6 @@ app.MapPost("/api/entrega/subir-comprobante", [Authorize(Roles = "Personal de En
     }
 });
 
-// Confirmar entrega
 app.MapPost("/api/entrega/confirmar-entrega", [Authorize(Roles = "Personal de Entrega")] async (
     ConfirmarEntregaRequest request,
     IEntregaService entregaService,
@@ -923,7 +894,6 @@ app.MapPost("/api/entrega/confirmar-entrega", [Authorize(Roles = "Personal de En
     }
 });
 
-// Endpoint para servir PDFs de entrega
 app.MapGet("/Documents/entrega/{fileName}", async (string fileName, HttpContext context) =>
 {
     var filePath = Path.Combine(Directory.GetCurrentDirectory(), "Documents", "entrega", fileName);
@@ -939,12 +909,7 @@ app.MapGet("/Documents/entrega/{fileName}", async (string fileName, HttpContext 
     await context.Response.SendFileAsync(filePath);
 });
 
-// ============================================
-// ENDPOINTS PARA CLIENTE DASHBOARD
-// ============================================
-
-// Obtener dashboard del cliente
-app.MapPost("/api/cliente/dashboard", [Authorize(Roles = "Cliente")] async (
+app.MapPost("/api/cliente/dashboard", [Authorize] async (
     ClienteDashboardRequest request,
     IClienteService clienteService,
     HttpContext httpContext) =>
@@ -954,7 +919,7 @@ app.MapPost("/api/cliente/dashboard", [Authorize(Roles = "Cliente")] async (
     try
     {
         var clienteId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        logger.LogInformation($"Obteniendo dashboard para cliente ID: {clienteId}");
+        logger.LogInformation($"Obteniendo dashboard para usuario ID: {clienteId}");
 
         var dashboard = await clienteService.ObtenerDashboardClienteAsync(clienteId, request);
         return Results.Ok(dashboard);
@@ -966,8 +931,7 @@ app.MapPost("/api/cliente/dashboard", [Authorize(Roles = "Cliente")] async (
     }
 });
 
-// Obtener PDF en base64
-app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Cliente")] async (
+app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize] async (
     string tipo,
     string nombreArchivo,
     IClienteService clienteService,
@@ -977,10 +941,8 @@ app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Client
 
     try
     {
-        // Validar que el cliente tiene acceso a este PDF
         var clienteId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
-        // Construir ruta según tipo
         var rutaBase = Path.Combine(Directory.GetCurrentDirectory(), "Documents");
         string rutaPdf;
 
@@ -991,16 +953,14 @@ app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Client
         else
             return Results.BadRequest("Tipo de PDF no válido");
 
-        logger.LogInformation($"Solicitando PDF: {rutaPdf} para cliente ID: {clienteId}");
+        logger.LogInformation($"Solicitando PDF: {rutaPdf} para usuario ID: {clienteId}");
 
-        // Verificar que el archivo existe
         if (!File.Exists(rutaPdf))
         {
             logger.LogWarning($"PDF no encontrado: {rutaPdf}");
             return Results.NotFound("Archivo no encontrado");
         }
 
-        // Obtener PDF en base64
         var pdfBase64 = await clienteService.ObtenerPdfBase64Async(rutaPdf);
 
         if (string.IsNullOrEmpty(pdfBase64))
@@ -1015,11 +975,6 @@ app.MapGet("/api/cliente/pdf/{tipo}/{nombreArchivo}", [Authorize(Roles = "Client
     }
 });
 
-// ============================================
-// ENDPOINTS PARA ADMIN - DATOS EMPRESA
-// ============================================
-
-// Obtener datos de la empresa
 app.MapGet("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] async (IDatosEmpresaService datosEmpresaService, ILogger<Program> logger) =>
 {
     try
@@ -1035,7 +990,6 @@ app.MapGet("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] asyn
     }
 });
 
-// Actualizar datos de la empresa
 app.MapPut("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] async (UpdateDatosEmpresaRequest request, IDatosEmpresaService datosEmpresaService, ILogger<Program> logger) =>
 {
     try
@@ -1056,46 +1010,36 @@ app.MapPut("/api/admin/datos-empresa", [Authorize(Roles = "Administrador")] asyn
     }
 });
 
-// ============================================
-// ENDPOINTS PARA E-COMMERCE (PÚBLICOS Y AUTENTICADOS)
-// ============================================
-
-// Categorías
 app.MapGet("/api/ecommerce/categorias", async (ICategoryService categoryService) =>
 {
     var categorias = await categoryService.GetAllCategoriesAsync();
     return Results.Ok(categorias);
 }).AllowAnonymous();
 
-// Productos con filtros
 app.MapPost("/api/ecommerce/productos", async (ProductFilterRequest filter, IProductService productService) =>
 {
     var productos = await productService.GetProductsAsync(filter);
     return Results.Ok(productos);
 }).AllowAnonymous();
 
-// Producto por ID
 app.MapGet("/api/ecommerce/productos/{id:int}", async (int id, IProductService productService) =>
 {
     var producto = await productService.GetProductByIdAsync(id);
     return producto is not null ? Results.Ok(producto) : Results.NotFound();
 }).AllowAnonymous();
 
-// Productos populares
 app.MapGet("/api/ecommerce/productos/populares", async (IProductService productService) =>
 {
     var productos = await productService.GetPopularProductsAsync(10);
     return Results.Ok(productos);
 }).AllowAnonymous();
 
-// Nuevos productos
 app.MapGet("/api/ecommerce/productos/nuevos", async (IProductService productService) =>
 {
     var productos = await productService.GetNewArrivalsAsync(10);
     return Results.Ok(productos);
 }).AllowAnonymous();
 
-// Carrito (requiere autenticación)
 app.MapGet("/api/ecommerce/carrito", [Authorize] async (HttpContext httpContext, ICartService cartService) =>
 {
     var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
@@ -1131,9 +1075,6 @@ app.MapDelete("/api/ecommerce/carrito", [Authorize] async (HttpContext httpConte
     return success ? Results.Ok() : Results.BadRequest();
 });
 
-// ============================================
-// ENDPOINT DE FACTURACIÓN ELECTRÓNICA
-// ============================================
 app.MapPost("/api/facturacion/facturar/{ventaId:int}", async (int ventaId, IFacturacionService facturacionService) =>
 {
     try
@@ -1146,9 +1087,7 @@ app.MapPost("/api/facturacion/facturar/{ventaId:int}", async (int ventaId, IFact
         return Results.BadRequest(new { error = ex.Message });
     }
 });
-// .RequireAuthorization(); // Descomenta si quieres requerir autenticación
 
-// Endpoint para consultar autorización de una clave de acceso
 app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso, ISriFacturacionService sriService, ILogger<Program> logger) =>
 {
     try
@@ -1156,7 +1095,6 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
         logger.LogInformation($"Consultando autorización para clave: {claveAcceso}");
         var respuesta = await sriService.ConsultarAutorizacion(claveAcceso);
 
-        // Intentar obtener autorización desde el objeto deserializado
         if (respuesta.RespuestaDeserializada?.RespuestaAutorizacionComprobante?.autorizaciones?.Length > 0)
         {
             var autorizacion = respuesta.RespuestaDeserializada.RespuestaAutorizacionComprobante.autorizaciones[0];
@@ -1173,14 +1111,12 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
             });
         }
 
-        // Si no se pudo por deserialización, intentar parseo manual del XML crudo
         string xmlParaParsear = respuesta.XmlRespuestaCruda;
         if (!string.IsNullOrEmpty(xmlParaParsear))
         {
             try
             {
                 var doc = XDocument.Parse(xmlParaParsear);
-                // Buscar elemento <autorizacion> por nombre local (sin namespace)
                 var authElement = doc.Descendants().FirstOrDefault(x => x.Name.LocalName == "autorizacion");
 
                 if (authElement != null)
@@ -1213,14 +1149,13 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
             }
         }
 
-        // Si aún no se encontró, devolver mensaje por defecto
         logger.LogWarning("No se encontraron autorizaciones en la respuesta deserializada ni en parseo manual.");
         return Results.Ok(new
         {
             claveAcceso,
             estado = "NO PROCESADO AÚN",
             mensaje = "El comprobante aún no ha sido procesado o no existe",
-            xmlDepuracion = respuesta.XmlRespuestaCruda // opcional, útil para debug
+            xmlDepuracion = respuesta.XmlRespuestaCruda
         });
     }
     catch (Exception ex)
@@ -1230,11 +1165,6 @@ app.MapGet("/api/facturacion/consultar/{claveAcceso}", async (string claveAcceso
     }
 }).AllowAnonymous();
 
-// ============================================
-// ENDPOINTS DE PAYPHONE (PASARELA DE PAGO)
-// ============================================
-
-// Inicializar transacción (requiere autenticación)
 app.MapPost("/api/payphone/init", [Authorize] async (HttpContext httpContext, IPayphoneService payphoneService) =>
 {
     try
@@ -1249,7 +1179,6 @@ app.MapPost("/api/payphone/init", [Authorize] async (HttpContext httpContext, IP
     }
 });
 
-// Confirmar transacción (requiere autenticación)
 app.MapPost("/api/payphone/confirm", [Authorize] async (PayphoneConfirmRequest request, HttpContext httpContext, IPayphoneService payphoneService) =>
 {
     try
@@ -1264,15 +1193,12 @@ app.MapPost("/api/payphone/confirm", [Authorize] async (PayphoneConfirmRequest r
     }
 });
 
-// Endpoint para descargar PDF de factura
 app.MapGet("/api/facturacion/pdf/{ventaId:int}", [Authorize] async (int ventaId, HttpContext httpContext, ReclamosContext context, IConfiguration config) =>
 {
     var venta = await context.Ventas.FindAsync(ventaId);
     if (venta == null)
         return Results.NotFound();
 
-    // Verificar que el usuario es el comprador o tiene permisos
-    // (por simplicidad, solo verificamos que el usuario autenticado es el cliente)
     var usuarioId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
     if (venta.FkEmpresaCliente != usuarioId)
         return Results.Forbid();
@@ -1284,11 +1210,6 @@ app.MapGet("/api/facturacion/pdf/{ventaId:int}", [Authorize] async (int ventaId,
     return Results.File(bytes, "application/pdf", $"factura_{venta.CodigoFactura}.pdf");
 });
 
-// ============================================
-// ENDPOINTS PARA ENCARGADO DE INVENTARIO
-// ============================================
-
-// Ubicaciones
 app.MapGet("/api/inventario/ubicaciones", [Authorize(Roles = "Encargado_Inventario")] async (IInventoryService service) =>
 {
     var ubicaciones = await service.GetAllUbicacionesAsync();
@@ -1342,7 +1263,6 @@ app.MapDelete("/api/inventario/ubicaciones/{id:int}", [Authorize(Roles = "Encarg
     }
 });
 
-// Movimientos
 app.MapGet("/api/inventario/movimientos", [Authorize(Roles = "Encargado_Inventario")] async (int? productoId, DateTime? desde, DateTime? hasta, IInventoryService service) =>
 {
     var movimientos = await service.GetMovimientosAsync(productoId, desde, hasta);
@@ -1405,7 +1325,6 @@ app.MapPost("/api/inventario/devolucion", [Authorize(Roles = "Encargado_Inventar
     }
 });
 
-// Números de serie
 app.MapGet("/api/inventario/numeros-serie", [Authorize(Roles = "Encargado_Inventario")] async (int? productoId, string? estado, int? ubicacionId, IInventoryService service) =>
 {
     var numeros = await service.GetNumerosSerieAsync(productoId, estado, ubicacionId);
@@ -1425,7 +1344,6 @@ app.MapPut("/api/inventario/numeros-serie", [Authorize(Roles = "Encargado_Invent
     return result ? Results.Ok() : Results.NotFound();
 });
 
-// Proveedores
 app.MapGet("/api/inventario/proveedores", [Authorize(Roles = "Encargado_Inventario")] async (bool soloActivos, IInventoryService service) =>
 {
     var proveedores = await service.GetAllProveedoresAsync(soloActivos);
@@ -1472,11 +1390,6 @@ app.MapPatch("/api/inventario/proveedores/{id:int}/toggle", [Authorize(Roles = "
     return result ? Results.Ok() : Results.NotFound();
 });
 
-// ============================================
-// ENDPOINTS PARA GESTOR DE PRODUCTOS
-// ============================================
-
-// Productos (gestión completa)
 app.MapGet("/api/productos/gestion", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (bool includeInactivos, IProductManagementService service) =>
 {
     var productos = await service.GetAllProductosAsync(includeInactivos);
@@ -1569,7 +1482,6 @@ app.MapPatch("/api/productos/gestion/{id:int}/toggle", [Authorize(Roles = "Gesto
     return result ? Results.Ok() : Results.NotFound();
 });
 
-// Categorías (gestión)
 app.MapGet("/api/productos/categorias", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (bool includeInactivos, IProductManagementService service) =>
 {
     var categorias = await service.GetAllCategoriasAsync(includeInactivos);
@@ -1623,7 +1535,6 @@ app.MapDelete("/api/productos/categorias/{id:int}", [Authorize(Roles = "Gestor_P
     }
 });
 
-// Marcas (gestión)
 app.MapGet("/api/productos/marcas", [Authorize(Roles = "Gestor_Productos,Encargado_Inventario")] async (IProductManagementService service) =>
 {
     var marcas = await service.GetAllMarcasAsync();
@@ -1677,10 +1588,6 @@ app.MapDelete("/api/productos/marcas/{id:int}", [Authorize(Roles = "Gestor_Produ
     }
 });
 
-// ============================================
-// ENDPOINTS PARA ANALISTA DE DATOS
-// ============================================
-
 app.MapGet("/api/analista/dashboard", [Authorize(Roles = "Analista_Datos")] async (IAnalistaService service) =>
 {
     var dashboard = await service.ObtenerDashboardAsync();
@@ -1698,10 +1605,6 @@ app.MapGet("/api/analista/exportar/inventario", [Authorize(Roles = "Analista_Dat
     var csv = await service.ExportarReporteInventarioAsync();
     return Results.File(csv, "text/csv", $"inventario_{DateTime.Now:yyyyMMdd}.csv");
 });
-
-// ============================================
-// ENDPOINTS PARA PERFIL DE USUARIO (TODOS LOS ROLES)
-// ============================================
 
 app.MapGet("/api/user/profile", [Authorize] async (HttpContext httpContext, IUserService userService) =>
 {
@@ -1748,10 +1651,6 @@ app.MapPut("/api/user/profile", [Authorize] async (UpdateProfileRequest request,
         return Results.Problem($"Error interno: {ex.Message}");
     }
 }).WithName("UpdateUserProfile");
-
-// ============================================
-// ENDPOINTS PARA FACTURAS DEL USUARIO
-// ==========================================
 
 app.MapGet("/api/factura/mis-facturas", [Authorize] async (HttpContext httpContext, ReclamosContext context) =>
 {
@@ -1800,7 +1699,6 @@ app.MapGet("/api/factura/pdf/{ventaId:int}", [Authorize] async (int ventaId, Htt
     return Results.File(pdfBytes, "application/pdf", $"factura_{venta.CodigoFactura}.pdf");
 }).WithName("GetFacturaPdf");
 
-// Eliminar proveedor (solo si no tiene productos asociados)
 app.MapDelete("/api/inventario/proveedores/{id:int}", [Authorize(Roles = "Encargado_Inventario")] async (int id, IInventoryService service) =>
 {
     try
