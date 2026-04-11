@@ -1,5 +1,5 @@
 export interface ValidarClienteRequest {
-    ruc: string;
+    identificador: string;
 }
 
 export interface ValidarClienteResponse {
@@ -7,6 +7,16 @@ export interface ValidarClienteResponse {
     mensaje?: string;
     clienteId?: number;
     razonSocial?: string;
+}
+
+export interface ProductoCompradoDTO {
+    numeroSerie: string;
+    marca: string;
+    modelo: string;
+    precio: number;
+    fechaCompra: string;
+    diasGarantia: number;
+    tieneGarantia: boolean;
 }
 
 export interface ValidarProductoRequest {
@@ -33,7 +43,7 @@ export interface ProductoReclamadoRequest {
 }
 
 export interface CrearReclamoRequest {
-    rucCliente: string;
+    identificadorCliente: string;
     productos: ProductoReclamadoRequest[];
 }
 

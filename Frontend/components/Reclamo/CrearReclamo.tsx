@@ -32,6 +32,8 @@ import {
   InputLabel,
   Select,
   SelectChangeEvent,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -41,10 +43,11 @@ import {
   Print as PrintIcon,
   Person as PersonIcon,
   List as ListIcon,
+  ShoppingCart as ShoppingCartIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { reclamoService } from '../../services/reclamoService';
-import { ProductoReclamado, ValidarClienteResponse } from '../../src/types/reclamo';
+import { ProductoReclamado, ValidarClienteResponse, ProductoCompradoDTO } from '../../src/types/reclamo';
 
 interface ClienteValidadoType {
   esValido: boolean;
@@ -61,13 +64,16 @@ const CrearReclamo = () => {
   const [successMessage, setSuccessMessage] = useState<string>('');
 
   // Paso 1: Validar cliente
-  const [rucCliente, setRucCliente] = useState<string>('');
+  const [identificadorCliente, setIdentificadorCliente] = useState<string>('');
   const [clienteValidado, setClienteValidado] = useState<ClienteValidadoType | null>(null);
 
   // Paso 2: Agregar productos
+  const [tabValue, setTabValue] = useState(0); // 0: escribir serie, 1: historial
   const [numeroSerie, setNumeroSerie] = useState<string>('');
   const [productos, setProductos] = useState<ProductoReclamado[]>([]);
   const [formaCompensacion, setFormaCompensacion] = useState<'Reembolso' | 'Reemplazo'>('Reembolso');
+  const [productosComprados, setProductosComprados] = useState<ProductoCompradoDTO[]>([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
   // Paso 3: Confirmar
   const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
@@ -75,8 +81,8 @@ const CrearReclamo = () => {
   const steps = ['Validar Cliente', 'Agregar Productos', 'Confirmar Reclamo'];
 
   const handleValidarCliente = async (): Promise<void> => {
-    if (!rucCliente.trim()) {
-      setErrorMessage('Por favor ingrese el RUC del cliente');
+    if (!identificadorCliente.trim()) {
+      setErrorMessage('Por favor ingrese cédula, RUC o pasaporte del cliente');
       return;
     }
 
@@ -85,12 +91,14 @@ const CrearReclamo = () => {
     setSuccessMessage('');
 
     try {
-      const response: ValidarClienteResponse = await reclamoService.validarCliente({ ruc: rucCliente });
+      const response: ValidarClienteResponse = await reclamoService.validarCliente({ identificador: identificadorCliente });
 
       if (response.esValido) {
         setClienteValidado(response);
         setActiveStep(1);
         setSuccessMessage('Cliente validado correctamente');
+        // Cargar productos comprados para la pestaña de historial
+        cargarProductosComprados();
       } else {
         setErrorMessage(response.mensaje || 'Error al validar cliente');
       }
@@ -99,6 +107,19 @@ const CrearReclamo = () => {
       setErrorMessage('Error al validar cliente');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarProductosComprados = async () => {
+    if (!identificadorCliente) return;
+    setCargandoHistorial(true);
+    try {
+      const data = await reclamoService.obtenerProductosComprados(identificadorCliente);
+      setProductosComprados(data);
+    } catch (error) {
+      console.error('Error cargando historial:', error);
+    } finally {
+      setCargandoHistorial(false);
     }
   };
 
@@ -144,8 +165,10 @@ const CrearReclamo = () => {
         } : p
       ));
 
-      if (!response.esValido) {
+      if (!response.esValido || !response.tieneGarantia) {
         setErrorMessage(response.mensaje || 'Producto no válido');
+        // Remover producto inválido
+        setProductos(prev => prev.filter(p => p.id !== productoId));
       } else {
         setNumeroSerie('');
         setFormaCompensacion('Reembolso');
@@ -163,6 +186,34 @@ const CrearReclamo = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAgregarDesdeHistorial = (producto: ProductoCompradoDTO) => {
+    // Verificar si ya fue agregado
+    if (productos.some(p => p.numeroSerie === producto.numeroSerie)) {
+      setErrorMessage('Este producto ya ha sido agregado');
+      return;
+    }
+
+    const productoId = `producto-${Date.now()}`;
+    const nuevoProducto: ProductoReclamado = {
+      id: productoId,
+      numeroSerie: producto.numeroSerie,
+      marca: producto.marca,
+      modelo: producto.modelo,
+      tieneGarantia: producto.tieneGarantia,
+      formaCompensacion: formaCompensacion,
+      especificacion: `${producto.marca} ${producto.modelo}`,
+      precio: producto.precio,
+      validando: false,
+    };
+
+    if (!producto.tieneGarantia) {
+      setErrorMessage('Este producto no tiene garantía válida');
+      return;
+    }
+
+    setProductos(prev => [...prev, nuevoProducto]);
   };
 
   const handleEliminarProducto = (id: string): void => {
@@ -185,7 +236,7 @@ const CrearReclamo = () => {
 
     try {
       console.log('=== DEPURACIÓN - ANTES DE ENVIAR ===');
-      console.log('Cliente RUC:', rucCliente);
+      console.log('Cliente Identificador:', identificadorCliente);
       console.log('Productos válidos:', productosValidos);
 
       const productosParaEnviar = productosValidos.map(p => ({
@@ -194,7 +245,7 @@ const CrearReclamo = () => {
       }));
 
       const request = {
-        rucCliente: rucCliente.trim(),
+        identificadorCliente: identificadorCliente.trim(),
         productos: productosParaEnviar
       };
 
@@ -239,8 +290,8 @@ const CrearReclamo = () => {
     }
   };
 
-  const handleRucClienteChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    setRucCliente(e.target.value);
+  const handleIdentificadorChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setIdentificadorCliente(e.target.value);
   };
 
   const handleNumeroSerieChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -263,12 +314,12 @@ const CrearReclamo = () => {
             </Typography>
 
             <TextField
-              label="RUC del Cliente"
-              value={rucCliente}
-              onChange={handleRucClienteChange}
+              label="Cédula / RUC / Pasaporte"
+              value={identificadorCliente}
+              onChange={handleIdentificadorChange}
               fullWidth
               margin="normal"
-              placeholder="Ingrese el RUC del cliente"
+              placeholder="Ingrese la identificación del cliente"
               disabled={loading}
             />
 
@@ -281,7 +332,7 @@ const CrearReclamo = () => {
             <Button
               variant="contained"
               onClick={handleValidarCliente}
-              disabled={loading || !rucCliente.trim()}
+              disabled={loading || !identificadorCliente.trim()}
               sx={{ mt: 3 }}
               startIcon={<PersonIcon />}
             >
@@ -297,43 +348,100 @@ const CrearReclamo = () => {
               Agregar Productos
             </Typography>
 
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  label="Número de Serie"
-                  value={numeroSerie}
-                  onChange={handleNumeroSerieChange}
-                  fullWidth
-                  placeholder="Ingrese el número de serie del producto"
-                  disabled={loading}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Forma de Compensación</InputLabel>
-                  <Select
-                    value={formaCompensacion}
-                    onChange={handleFormaCompensacionChange}
-                    label="Forma de Compensación"
-                  >
-                    <MenuItem value="Reembolso">Reembolso</MenuItem>
-                    <MenuItem value="Reemplazo">Reemplazo</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 2 }}>
-                <Button
-                  variant="contained"
-                  onClick={handleAgregarProducto}
-                  disabled={loading || !numeroSerie.trim()}
-                  fullWidth
-                  sx={{ height: '56px' }}
-                  startIcon={<AddIcon />}
-                >
-                  Agregar
-                </Button>
-              </Grid>
-            </Grid>
+            <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ mb: 2 }}>
+              <Tab label="Escribir Número de Serie" />
+              <Tab label="Seleccionar del Historial" />
+            </Tabs>
+
+            {tabValue === 0 && (
+              <>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      label="Número de Serie"
+                      value={numeroSerie}
+                      onChange={handleNumeroSerieChange}
+                      fullWidth
+                      placeholder="Ingrese el número de serie del producto"
+                      disabled={loading}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <FormControl fullWidth>
+                      <InputLabel>Forma de Compensación</InputLabel>
+                      <Select
+                        value={formaCompensacion}
+                        onChange={handleFormaCompensacionChange}
+                        label="Forma de Compensación"
+                      >
+                        <MenuItem value="Reembolso">Reembolso</MenuItem>
+                        <MenuItem value="Reemplazo">Reemplazo</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={handleAgregarProducto}
+                      disabled={loading || !numeroSerie.trim()}
+                      fullWidth
+                      sx={{ height: '56px' }}
+                      startIcon={<AddIcon />}
+                    >
+                      Agregar
+                    </Button>
+                  </Grid>
+                </Grid>
+              </>
+            )}
+
+            {tabValue === 1 && (
+              <Box sx={{ mb: 3 }}>
+                {cargandoHistorial ? (
+                  <CircularProgress />
+                ) : (
+                  <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                    <Table stickyHeader size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>N° Serie</TableCell>
+                          <TableCell>Producto</TableCell>
+                          <TableCell>Fecha Compra</TableCell>
+                          <TableCell>Garantía</TableCell>
+                          <TableCell>Acción</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {productosComprados.map((prod) => (
+                          <TableRow key={prod.numeroSerie}>
+                            <TableCell>{prod.numeroSerie}</TableCell>
+                            <TableCell>{prod.marca} {prod.modelo}</TableCell>
+                            <TableCell>{prod.fechaCompra ? new Date(prod.fechaCompra).toLocaleDateString('es-EC') : '-'}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={prod.tieneGarantia ? 'Válida' : 'Vencida'}
+                                color={prod.tieneGarantia ? 'success' : 'error'}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleAgregarDesdeHistorial(prod)}
+                                disabled={!prod.tieneGarantia || productos.some(p => p.numeroSerie === prod.numeroSerie)}
+                              >
+                                Agregar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            )}
 
             {productos.length > 0 && (
               <Card sx={{ mt: 3 }}>
@@ -453,15 +561,15 @@ const CrearReclamo = () => {
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      RUC
+                      Identificación
                     </Typography>
                     <Typography variant="body1">
-                      {rucCliente}
+                      {identificadorCliente}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Razón Social
+                      Nombre
                     </Typography>
                     <Typography variant="body1">
                       {clienteValidado?.razonSocial || 'No validado'}
@@ -474,7 +582,7 @@ const CrearReclamo = () => {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="subtitle1" gutterBottom>
-                  Productos a Reclamado
+                  Productos a Reclamar
                 </Typography>
                 <TableContainer>
                   <Table size="small">

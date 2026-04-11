@@ -1,12 +1,12 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import api from './api';
-import type{
+import type {
     ValidarClienteRequest,
     ValidarClienteResponse,
     ValidarProductoRequest,
     ValidarProductoResponse,
     CrearReclamoRequest,
-    CrearReclamoResponse
+    CrearReclamoResponse,
+    ProductoCompradoDTO
 } from '../src/types/reclamo';
 
 export const reclamoService = {
@@ -20,6 +20,16 @@ export const reclamoService = {
                 esValido: false,
                 mensaje: error.response?.data?.mensaje || 'Error al validar cliente'
             };
+        }
+    },
+
+    async obtenerProductosComprados(identificador: string): Promise<ProductoCompradoDTO[]> {
+        try {
+            const response = await api.post<ProductoCompradoDTO[]>('/reclamos/productos-comprados', { identificador });
+            return response.data;
+        } catch (error: any) {
+            console.error('Error obteniendo productos comprados:', error);
+            return [];
         }
     },
 
@@ -41,7 +51,7 @@ export const reclamoService = {
         try {
             console.log('========================================');
             console.log('ENVIANDO SOLICITUD PARA CREAR RECLAMO');
-            console.log('RUC Cliente:', request.rucCliente);
+            console.log('Identificador Cliente:', request.identificadorCliente);
             console.log('Productos a enviar:', request.productos);
             console.log('Solicitud completa:', JSON.stringify(request, null, 2));
             console.log('========================================');

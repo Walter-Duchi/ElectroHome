@@ -2,6 +2,6 @@
 {
     public class ValidarClienteRequest
     {
-        public string Ruc { get; set; } = null!;
+        public string Identificador { get; set; } = null!;
     }
 }

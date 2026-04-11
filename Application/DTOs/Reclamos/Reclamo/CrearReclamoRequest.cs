@@ -2,7 +2,7 @@
 {
     public class CrearReclamoRequest
     {
-        public string RucCliente { get; set; } = null!;
+        public string IdentificadorCliente { get; set; } = null!;
         public List<ProductoReclamadoRequest> Productos { get; set; } = new();
     }
 }

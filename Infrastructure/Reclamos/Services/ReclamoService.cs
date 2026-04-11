@@ -25,35 +25,36 @@ namespace Infrastructure.Reclamos.Services
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
-        public async Task<ValidarClienteResponse> ValidarClienteAsync(string ruc)
+        public async Task<ValidarClienteResponse> ValidarClienteAsync(string identificador)
         {
             try
             {
-                var cliente = await _context.Usuarios
-                    .Where(u => u.Ruc == ruc && u.Rol == "Cliente")
-                    .Select(u => new { u.Id, u.Nombres, u.Apellidos, u.Ruc })
+                // Buscar por cédula, RUC o pasaporte (sin filtrar por rol)
+                var usuario = await _context.Usuarios
+                    .Where(u => u.Identificacion == identificador || u.Ruc == identificador)
+                    .Select(u => new { u.Id, u.Nombres, u.Apellidos, u.Identificacion, u.Ruc })
                     .FirstOrDefaultAsync();
 
-                if (cliente == null)
+                if (usuario == null)
                 {
                     return new ValidarClienteResponse
                     {
                         EsValido = false,
-                        Mensaje = "Cliente no encontrado o no tiene rol de cliente."
+                        Mensaje = "No se encontró ningún usuario con la identificación proporcionada."
                     };
                 }
 
                 return new ValidarClienteResponse
                 {
                     EsValido = true,
-                    Mensaje = "Cliente válido.",
-                    ClienteId = cliente.Id,
-                    RazonSocial = $"{cliente.Nombres} {cliente.Apellidos}"
+                    Mensaje = "Usuario válido.",
+                    ClienteId = usuario.Id,
+                    RazonSocial = $"{usuario.Nombres} {usuario.Apellidos}"
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al validar cliente con RUC: {Ruc}", ruc);
+                _logger.LogError(ex, "Error al validar cliente con identificador: {Identificador}", identificador);
                 return new ValidarClienteResponse
                 {
                     EsValido = false,
@@ -79,6 +80,20 @@ namespace Infrastructure.Reclamos.Services
                     {
                         EsValido = false,
                         Mensaje = "Producto no encontrado."
+                    };
+                }
+
+                // Verificar si el producto ya está en un reclamo activo
+                var yaEnReclamo = await _context.ReclamosProductoSns
+                    .AnyAsync(rps => rps.FkNumeroSerieProductos == producto.Id &&
+                                    (rps.Estado == "Pendiente" || rps.Estado == "En Revision" || rps.Estado == "Aprobado"));
+
+                if (yaEnReclamo)
+                {
+                    return new ValidarProductoResponse
+                    {
+                        EsValido = false,
+                        Mensaje = "El producto ya se encuentra en un reclamo activo."
                     };
                 }
 
@@ -171,6 +186,55 @@ namespace Infrastructure.Reclamos.Services
             }
         }
 
+        public async Task<List<ProductoCompradoDTO>> ObtenerProductosCompradosAsync(string identificadorCliente)
+        {
+            // Buscar usuario por cédula, RUC o pasaporte
+            var usuario = await _context.Usuarios
+                .Where(u => u.Identificacion == identificadorCliente || u.Ruc == identificadorCliente)
+                .FirstOrDefaultAsync();
+
+            if (usuario == null)
+                return new List<ProductoCompradoDTO>();
+
+            var productosComprados = await _context.Ventas
+                .Where(v => v.FkEmpresaCliente == usuario.Id && v.EstadoSri == "Autorizado")
+                .SelectMany(v => v.VentasPorNumeroSerieProductos)
+                .Select(vp => new
+                {
+                    vp.FkNumeroSerieProductoNavigation.NumeroSerie,
+                    vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.FkMarcaNavigation.Nombre,
+                    vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.Modelo,
+                    vp.PrecioVenta,
+                    vp.FkVentasNavigation.FechaCompra,
+                    vp.FkNumeroSerieProductoNavigation.FkProductoNavigation.DiasGarantia,
+                    vp.FkNumeroSerieProductoNavigation.Id
+                })
+                .Distinct()
+                .ToListAsync();
+
+            // Filtrar aquellos que ya están en un reclamo activo
+            var numerosSerieEnReclamo = await _context.ReclamosProductoSns
+                .Where(rps => (rps.Estado == "Pendiente" || rps.Estado == "En Revision" || rps.Estado == "Aprobado"))
+                .Select(rps => rps.FkNumeroSerieProductosNavigation.NumeroSerie)
+                .ToListAsync();
+
+            var resultado = productosComprados
+                .Where(p => !numerosSerieEnReclamo.Contains(p.NumeroSerie))
+                .Select(p => new ProductoCompradoDTO
+                {
+                    NumeroSerie = p.NumeroSerie,
+                    Marca = p.Nombre,
+                    Modelo = p.Modelo,
+                    Precio = p.PrecioVenta,
+                    FechaCompra = p.FechaCompra,
+                    DiasGarantia = p.DiasGarantia,
+                    TieneGarantia = p.FechaCompra.HasValue && p.DiasGarantia > 0 && p.FechaCompra.Value.AddDays(p.DiasGarantia) >= DateTime.Now
+                })
+                .ToList();
+
+            return resultado;
+        }
+
         public async Task<CrearReclamoResponse> CrearReclamoAsync(CrearReclamoRequest request, int revisorId)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -179,18 +243,18 @@ namespace Infrastructure.Reclamos.Services
                 _logger.LogInformation("========================================");
                 _logger.LogInformation("INICIANDO CREACIÓN DE RECLAMO CON DISTRIBUCIÓN EQUITATIVA DE TÉCNICOS");
                 _logger.LogInformation("RevisorId: {RevisorId}", revisorId);
-                _logger.LogInformation("RUC Cliente: {RucCliente}", request.RucCliente);
+                _logger.LogInformation("Identificador Cliente: {Identificador}", request.IdentificadorCliente);
                 _logger.LogInformation("Productos solicitados: {@Productos}", request.Productos);
                 _logger.LogInformation("========================================");
 
-                // 1. Validar cliente
-                _logger.LogInformation("Validando cliente con RUC: {RucCliente}", request.RucCliente);
+                // 1. Validar cliente (cédula, RUC o pasaporte)
+                _logger.LogInformation("Validando cliente con identificador: {Identificador}", request.IdentificadorCliente);
                 var cliente = await _context.Usuarios
-                    .FirstOrDefaultAsync(u => u.Ruc == request.RucCliente && u.Rol == "Cliente");
+                    .FirstOrDefaultAsync(u => u.Identificacion == request.IdentificadorCliente || u.Ruc == request.IdentificadorCliente);
 
                 if (cliente == null)
                 {
-                    _logger.LogError("Cliente no encontrado con RUC: {RucCliente}", request.RucCliente);
+                    _logger.LogError("Cliente no encontrado con identificador: {Identificador}", request.IdentificadorCliente);
                     return new CrearReclamoResponse
                     {
                         Exito = false,
@@ -200,44 +264,13 @@ namespace Infrastructure.Reclamos.Services
                 _logger.LogInformation("Cliente validado: {ClienteId} - {Nombre}", cliente.Id, $"{cliente.Nombres} {cliente.Apellidos}");
 
                 // 2. Validar cada producto y obtener información de marcas
-                var productosConMarca = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId)>();
+                var productosConMarca = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, DateTime? fechaVenta)>();
 
                 foreach (var productoReq in request.Productos)
                 {
                     _logger.LogInformation("Validando producto: {NumeroSerie}", productoReq.NumeroSerie);
 
-                    // Primero, verificar si el producto ya está en un reclamo
-                    var productoExistente = await _context.NumeroSerieProductos
-                        .Include(nsp => nsp.FkProductoNavigation)
-                        .FirstOrDefaultAsync(nsp => nsp.NumeroSerie == productoReq.NumeroSerie);
-
-                    if (productoExistente == null)
-                    {
-                        _logger.LogError("Producto no encontrado: {NumeroSerie}", productoReq.NumeroSerie);
-                        await transaction.RollbackAsync();
-                        return new CrearReclamoResponse
-                        {
-                            Exito = false,
-                            Mensaje = $"Producto {productoReq.NumeroSerie} no encontrado."
-                        };
-                    }
-
-                    // Verificar si ya está en un reclamo activo
-                    var yaEnReclamo = await _context.ReclamosProductoSns
-                        .AnyAsync(rps => rps.FkNumeroSerieProductos == productoExistente.Id &&
-                        (rps.Estado == "Pendiente" || rps.Estado == "En Revision" || rps.Estado == "Aprobado"));
-
-                    if (yaEnReclamo)
-                    {
-                        _logger.LogError("Producto {NumeroSerie} ya está en un reclamo activo", productoReq.NumeroSerie);
-                        await transaction.RollbackAsync();
-                        return new CrearReclamoResponse
-                        {
-                            Exito = false,
-                            Mensaje = $"El producto {productoReq.NumeroSerie} ya está en un reclamo activo y no puede ser reclamado nuevamente."
-                        };
-                    }
-
+                    // Verificar si ya está en un reclamo activo (se hace dentro de ValidarProductoAsync, pero lo duplicamos por seguridad)
                     var validacion = await ValidarProductoAsync(productoReq.NumeroSerie);
 
                     _logger.LogInformation("Resultado validación producto {NumeroSerie}: EsValido={EsValido}, TieneGarantia={TieneGarantia}, Mensaje={Mensaje}",
@@ -273,7 +306,7 @@ namespace Infrastructure.Reclamos.Services
                         .Select(nsp => nsp.FkProductoNavigation.FkMarca)
                         .FirstOrDefaultAsync();
 
-                    productosConMarca.Add((validacion.ProductoId.Value, productoReq.FormaCompensacion, productoReq.NumeroSerie, marcaId));
+                    productosConMarca.Add((validacion.ProductoId.Value, productoReq.FormaCompensacion, productoReq.NumeroSerie, marcaId, validacion.FechaVenta));
                 }
 
                 // 3. Crear código de reclamo
@@ -319,10 +352,10 @@ namespace Infrastructure.Reclamos.Services
                     .ToDictionaryAsync(x => x.TecnicoId, x => x.Carga);
 
                 // Lista para guardar asignaciones finales
-                var productosConTecnico = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario tecnicoAsignado)>();
+                var productosConTecnico = new List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario tecnicoAsignado, DateTime? fechaVenta)>();
 
                 // Procesar cada producto uno por uno
-                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId) in productosConMarca)
+                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, fechaVenta) in productosConMarca)
                 {
                     _logger.LogInformation("Procesando producto {NumeroSerie} de marca {MarcaId}", numeroSerie, marcaId);
 
@@ -396,7 +429,7 @@ namespace Infrastructure.Reclamos.Services
                         cargaTrabajo[tecnicoAsignado.Id] = 1;
                     }
 
-                    productosConTecnico.Add((numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado));
+                    productosConTecnico.Add((numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado, fechaVenta));
 
                     _logger.LogInformation("Asignado técnico {TecnicoId} ({Nombre}) al producto {NumeroSerie}. Carga actual: {Carga}",
                         tecnicoAsignado.Id, $"{tecnicoAsignado.Nombres} {tecnicoAsignado.Apellidos}",
@@ -434,7 +467,7 @@ namespace Infrastructure.Reclamos.Services
                 // 7. Crear productos del reclamo CON técnicos ya asignados
                 var reclamosProductos = new List<ReclamosProductoSn>();
 
-                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado) in productosConTecnico)
+                foreach (var (numeroSerieProductoId, formaCompensacion, numeroSerie, marcaId, tecnicoAsignado, fechaVenta) in productosConTecnico)
                 {
                     if (tecnicoAsignado == null)
                     {
@@ -454,7 +487,8 @@ namespace Infrastructure.Reclamos.Services
                         FormaCompensacion = formaCompensacion,
                         Estado = "Pendiente",
                         FkTecnicoAsignado = tecnicoAsignado.Id,
-                        FechaReclamoClienteFinal = DateTime.Now
+                        FechaReclamoClienteFinal = DateTime.Now,
+                        FechaVentaClienteFinal = fechaVenta ?? DateTime.Now // Usar fecha de venta real; si es null, usar hoy (no debería ocurrir)
                     };
 
                     reclamosProductos.Add(reclamoProducto);
@@ -525,7 +559,7 @@ namespace Infrastructure.Reclamos.Services
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                _logger.LogError(ex, "Error al crear reclamo para el cliente con RUC: {Ruc}", request.RucCliente);
+                _logger.LogError(ex, "Error al crear reclamo para el cliente con identificador: {Identificador}", request.IdentificadorCliente);
 
                 var errorMessage = ex.Message;
                 var innerEx = ex.InnerException;
@@ -545,13 +579,13 @@ namespace Infrastructure.Reclamos.Services
 
         private async Task<(bool exito, string pdfBase64, string rutaArchivo, string mensajeError)> GenerarPdfRealAsync(
             int reclamoId, string codigoReclamo, Usuario cliente,
-            List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario tecnicoAsignado)> productos)
+            List<(int numeroSerieProductoId, string formaCompensacion, string numeroSerie, int marcaId, Usuario tecnicoAsignado, DateTime? fechaVenta)> productos)
         {
             try
             {
                 // Obtener detalles completos de los productos
                 var productosDetalle = new List<dynamic>();
-                foreach (var (id, forma, numeroSerie, marcaId, tecnico) in productos)
+                foreach (var (id, forma, numeroSerie, marcaId, tecnico, fechaVenta) in productos)
                 {
                     var producto = await _context.NumeroSerieProductos
                         .Include(nsp => nsp.FkProductoNavigation)
@@ -603,7 +637,7 @@ namespace Infrastructure.Reclamos.Services
                                 // Información del cliente
                                 x.Item().PaddingTop(10).Text("INFORMACIÓN DEL CLIENTE").SemiBold().FontSize(14);
                                 x.Item().Text($"Razón Social: {cliente.Nombres} {cliente.Apellidos}");
-                                x.Item().Text($"RUC: {cliente.Ruc}");
+                                x.Item().Text($"Identificación: {cliente.Identificacion}");
                                 x.Item().Text($"Teléfono: {cliente.Celular}");
 
                                 // Productos reclamados

@@ -425,8 +425,14 @@ app.MapPost("/api/admin/crear-usuario", [Authorize(Roles = "Administrador")] asy
 
 app.MapPost("/api/reclamos/validar-cliente", [Authorize(Roles = "Revisor")] async (ValidarClienteRequest request, IReclamoService reclamoService) =>
 {
-    var response = await reclamoService.ValidarClienteAsync(request.Ruc);
+    var response = await reclamoService.ValidarClienteAsync(request.Identificador);
     return response.EsValido ? Results.Ok(response) : Results.BadRequest(response);
+});
+
+app.MapPost("/api/reclamos/productos-comprados", [Authorize(Roles = "Revisor")] async (ValidarClienteRequest request, IReclamoService reclamoService) =>
+{
+    var productos = await reclamoService.ObtenerProductosCompradosAsync(request.Identificador);
+    return Results.Ok(productos);
 });
 
 app.MapPost("/api/reclamos/validar-producto", [Authorize(Roles = "Revisor")] async (ValidarProductoRequest request, IReclamoService reclamoService) =>
