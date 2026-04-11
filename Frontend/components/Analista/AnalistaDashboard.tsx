@@ -1,3 +1,4 @@
+// Frontend/components/Analista/AnalistaDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Container, Grid, Paper, Typography, Box, Card, CardContent,
@@ -318,26 +319,49 @@ const AnalistaDashboard: React.FC = () => {
 
         {/* Reclamos por estado */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Typography variant="h6" gutterBottom>Reclamos por Estado</Typography>
-            <PieChart width={400} height={300}>
-              <Pie
-                data={data.reclamosPorEstado}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={renderCustomLabel}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="cantidad"
-                nameKey="estado"
-              >
-                {data.reclamosPorEstado.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <RechartsTooltip formatter={(value: unknown) => `${value as number} reclamos`} />
-            </PieChart>
+            <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+              <PieChart width={500} height={300}>
+                <Pie
+                  data={data.reclamosPorEstado}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="cantidad"
+                  nameKey="estado"
+                >
+                  {data.reclamosPorEstado.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip formatter={(value: unknown) => `${value as number} reclamos`} />
+              </PieChart>
+            </Box>
+            <Divider sx={{ my: 2, width: '100%' }} />
+            <TableContainer sx={{ maxHeight: 200 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Estado</TableCell>
+                    <TableCell align="right">Cantidad</TableCell>
+                    <TableCell align="right">Porcentaje</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.reclamosPorEstado.map((estado: ReclamoEstado) => (
+                    <TableRow key={estado.estado}>
+                      <TableCell>{estado.estado}</TableCell>
+                      <TableCell align="right">{estado.cantidad}</TableCell>
+                      <TableCell align="right">{estado.porcentaje.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
         </Grid>
 
