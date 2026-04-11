@@ -209,8 +209,8 @@ const EcommerceLayout: React.FC<EcommerceLayoutProps> = ({
                   <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
                   <ListItemText>Ver mis facturas</ListItemText>
                 </MenuItem>
-                <ThemeSelector variant="menu-item" />
                 <Divider />
+                <ThemeSelector variant="menu-item" />
                 <MenuItem onClick={handleLogout}>
                   <ListItemIcon><ExitToApp fontSize="small" /></ListItemIcon>
                   <ListItemText>Cerrar Sesión</ListItemText>

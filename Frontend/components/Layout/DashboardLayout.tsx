@@ -178,8 +178,8 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
           <ListItemText>Mis Facturas</ListItemText>
         </MenuItem>
-        <ThemeSelector variant="menu-item" />
         <Divider />
+        <ThemeSelector variant="menu-item" />
         <MenuItem onClick={handleLogout}>
           <ListItemIcon>
             <ExitToApp fontSize="small" />
