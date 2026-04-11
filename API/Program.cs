@@ -773,6 +773,26 @@ app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de En
     }
 });
 
+app.MapPost("/api/entrega/asignar-reemplazos-automatico", [Authorize(Roles = "Personal de Entrega")] async (
+    BuscarReclamoRequest request,
+    IEntregaService entregaService,
+    HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+    var personalEntregaId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    try
+    {
+        logger.LogInformation($"Asignando reemplazos automáticos para reclamo: {request.CodigoReclamo}");
+        var resultado = await entregaService.AsignarReemplazosAutomaticamenteAsync(request.CodigoReclamo, personalEntregaId);
+        return Results.Ok(new { exito = resultado });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, $"Error en asignación automática: {request.CodigoReclamo}");
+        return Results.BadRequest(new { mensaje = ex.Message });
+    }
+});
+
 app.MapPost("/api/entrega/seleccionar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
     SeleccionarReemplazoRequest request,
     IEntregaService entregaService,

@@ -13,5 +13,6 @@ namespace Infrastructure.Reclamos.Interfaces
         Task<bool> ConfirmarEntregaAsync(ConfirmarEntregaRequest request, int personalEntregaId);
         Task<bool> TodosProductosTienenReemplazoAsync(string codigoReclamo);
         Task<List<ReclamoPendienteEntregaDTO>> ObtenerReclamosPendientesEntregaAsync();
+        Task<bool> AsignarReemplazosAutomaticamenteAsync(string codigoReclamo, int personalEntregaId);
     }
 }

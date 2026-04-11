@@ -64,6 +64,101 @@ namespace Infrastructure.Reclamos.Services
             return reclamosPendientes;
         }
 
+        public async Task<bool> AsignarReemplazosAutomaticamenteAsync(string codigoReclamo, int personalEntregaId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                _logger.LogInformation("Asignando reemplazos automáticamente para reclamo: {CodigoReclamo}", codigoReclamo);
+
+                var reclamo = await _context.Reclamos
+                    .Include(r => r.ReclamosProductoSns)
+                        .ThenInclude(rps => rps.FkNumeroSerieProductosNavigation)
+                            .ThenInclude(nsp => nsp.FkProductoNavigation)
+                    .Include(r => r.ReclamosProductoSns)
+                        .ThenInclude(rps => rps.ComprobanteProductoReemplazado)
+                    .FirstOrDefaultAsync(r => r.CodigoReclamo == codigoReclamo);
+
+                if (reclamo == null)
+                    throw new InvalidOperationException($"Reclamo no encontrado: {codigoReclamo}");
+
+                // Obtener productos aprobados para reemplazo que aún no tienen reemplazo asignado
+                var productosPendientes = reclamo.ReclamosProductoSns
+                    .Where(rps => rps.Estado == "Aprobado" && rps.FormaCompensacion == "Reemplazo")
+                    .Where(rps => rps.ComprobanteProductoReemplazado == null)
+                    .ToList();
+
+                if (!productosPendientes.Any())
+                {
+                    _logger.LogInformation("No hay productos pendientes de asignación para este reclamo.");
+                    await transaction.CommitAsync();
+                    return true;
+                }
+
+                // Crear un comprobante de reemplazo único para todos los productos de este reclamo
+                var comprobanteReemplazo = new ComprobanteDeReemplazo
+                {
+                    PdfComprobanteEntregaCliente = "PENDIENTE_" + Guid.NewGuid().ToString(),
+                    FkPersonalEntrega = personalEntregaId,
+                    Estado = "Pendiente"
+                };
+                _context.ComprobanteDeReemplazos.Add(comprobanteReemplazo);
+                await _context.SaveChangesAsync();
+
+                foreach (var producto in productosPendientes)
+                {
+                    var productoDefectuoso = producto.FkNumeroSerieProductosNavigation;
+                    var marcaId = productoDefectuoso.FkProductoNavigation.FkMarca;
+                    var modelo = productoDefectuoso.FkProductoNavigation.Modelo;
+
+                    // Buscar un producto disponible para reemplazo (misma marca y modelo, estado Se_Puede_Vender)
+                    var reemplazoDisponible = await _context.NumeroSerieProductos
+                        .Include(nsp => nsp.FkProductoNavigation)
+                        .Where(nsp => nsp.FkProductoNavigation.FkMarca == marcaId &&
+                                      nsp.FkProductoNavigation.Modelo == modelo &&
+                                      nsp.EstadoInventario == "Se_Puede_Vender")
+                        .Where(nsp => !_context.ComprobanteProductoReemplazados
+                            .Any(cpr => cpr.FkProductoDeReemplazo == nsp.Id))
+                        .OrderBy(nsp => nsp.FechaIngreso) // FIFO: el más antiguo primero
+                        .FirstOrDefaultAsync();
+
+                    if (reemplazoDisponible == null)
+                    {
+                        _logger.LogError("No hay stock disponible para reemplazo del producto {Marca} {Modelo}", marcaId, modelo);
+                        throw new InvalidOperationException($"No hay stock disponible para reemplazar el producto {productoDefectuoso.NumeroSerie}. No se puede continuar.");
+                    }
+
+                    // Crear relación en ComprobanteProductoReemplazado
+                    var comprobanteProducto = new ComprobanteProductoReemplazado
+                    {
+                        FkReclamosProductoSn = producto.Id,
+                        FkProductoDeReemplazo = reemplazoDisponible.Id,
+                        FkComprobanteDeReemplazo = comprobanteReemplazo.Id
+                    };
+                    _context.ComprobanteProductoReemplazados.Add(comprobanteProducto);
+
+                    // Actualizar estado del producto de reemplazo
+                    reemplazoDisponible.EstadoInventario = "Entregado_Como_Reemplazo_Al_Cliente";
+
+                    _logger.LogInformation("Asignado reemplazo {NumeroSerieReemplazo} para producto defectuoso {NumeroSerieDefectuoso}",
+                        reemplazoDisponible.NumeroSerie, productoDefectuoso.NumeroSerie);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Asignación automática completada para reclamo {CodigoReclamo}", codigoReclamo);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error en asignación automática para reclamo {CodigoReclamo}", codigoReclamo);
+                throw;
+            }
+        }
+
+        // ... resto del archivo sin cambios (BuscarReclamoAsync, ValidarProductoReemplazoAsync, etc.)
         public async Task<BuscarReclamoResponse> BuscarReclamoAsync(string codigoReclamo)
         {
             try

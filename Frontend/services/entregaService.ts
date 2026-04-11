@@ -19,6 +19,12 @@ export const entregaService = {
         return response.data;
     },
 
+    // Asignar reemplazos automáticamente
+    asignarReemplazosAutomatico: async (codigoReclamo: string): Promise<{ exito: boolean }> => {
+        const response = await api.post('/entrega/asignar-reemplazos-automatico', { codigoReclamo });
+        return response.data;
+    },
+
     // Validar producto de reemplazo
     validarReemplazo: async (reclamoProductoSnId: number, numeroSerieReemplazo: string): Promise<ValidarReemplazoResponse> => {
         const response = await api.post('/entrega/validar-reemplazo', {

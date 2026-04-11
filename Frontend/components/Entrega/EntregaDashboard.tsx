@@ -15,36 +15,23 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   LinearProgress,
   Chip,
-  IconButton,
-  Tooltip,
   Stepper,
   Step,
   StepLabel,
   StepContent,
   CircularProgress,
-  Snackbar,
   Tabs,
   Tab,
 } from '@mui/material';
 import {
   Search,
   CheckCircle,
-  Error,
-  Warning,
-  Info,
-  Assignment,
+  Error as ErrorIcon,
   Download,
   Upload,
   Check,
-  Close,
-  Edit,
-  Visibility,
 } from '@mui/icons-material';
 import { entregaService } from '../../services/entregaService';
 import { type BuscarReclamoResponse, type ProductoEntregaDTO, type ReclamoPendienteEntregaDTO } from '../../src/types/entrega';
@@ -56,25 +43,20 @@ const EntregaDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
-  const [selectedProduct, setSelectedProduct] = useState<ProductoEntregaDTO | null>(null);
-  const [reemplazoInput, setReemplazoInput] = useState('');
-  const [validating, setValidating] = useState(false);
-  const [validationResult, setValidationResult] = useState<any>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [asignando, setAsignando] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [fileBase64, setFileBase64] = useState<string>('');
   const [reclamosPendientes, setReclamosPendientes] = useState<ReclamoPendienteEntregaDTO[]>([]);
   const [cargandoPendientes, setCargandoPendientes] = useState(false);
   const [tabBusqueda, setTabBusqueda] = useState(0); // 0 = código, 1 = lista
+  const [asignandoAutomatico, setAsignandoAutomatico] = useState(false);
 
   const steps = [
     'Buscar Reclamo',
-    'Asignar Reemplazos',
+    'Verificar Reemplazos Asignados',
     'Generar Comprobante',
     'Subir Comprobante Firmado',
     'Confirmar Entrega'
@@ -115,22 +97,14 @@ const EntregaDashboard: React.FC = () => {
       const response = await entregaService.buscarReclamo(codigoReclamo);
 
       if (response.exito) {
-        // VERIFICACIÓN CRÍTICA: Si no hay productos para entregar, NO avanzar
         if (!response.productos || response.productos.length === 0) {
           setError('No hay productos para entregar en este reclamo. Los productos deben estar aprobados y con forma de compensación "Reemplazo".');
           setReclamo(response);
           return;
         }
 
-        setReclamo(response);
-        setActiveStep(1);
-        setSuccess('Reclamo encontrado exitosamente');
-
-        // Verificar si todos los productos ya tienen reemplazo
-        const todosTienenReemplazo = response.productos.every(p => p.reemplazoValido);
-        if (todosTienenReemplazo) {
-          setActiveStep(2);
-        }
+        // Asignar reemplazos automáticamente
+        await asignarReemplazosYContinuar(codigoReclamo, response);
       } else {
         setError(response.mensaje);
       }
@@ -143,7 +117,6 @@ const EntregaDashboard: React.FC = () => {
 
   const handleSeleccionarReclamoPendiente = async (codigo: string) => {
     setCodigoReclamo(codigo);
-    // Buscar automáticamente el reclamo seleccionado
     setLoading(true);
     setError(null);
     setReclamo(null);
@@ -162,14 +135,8 @@ const EntregaDashboard: React.FC = () => {
           return;
         }
 
-        setReclamo(response);
-        setActiveStep(1);
-        setSuccess('Reclamo encontrado exitosamente');
-
-        const todosTienenReemplazo = response.productos.every(p => p.reemplazoValido);
-        if (todosTienenReemplazo) {
-          setActiveStep(2);
-        }
+        // Asignar reemplazos automáticamente
+        await asignarReemplazosYContinuar(codigo, response);
       } else {
         setError(response.mensaje);
       }
@@ -180,74 +147,32 @@ const EntregaDashboard: React.FC = () => {
     }
   };
 
-  const handleOpenDialog = (producto: ProductoEntregaDTO) => {
-    setSelectedProduct(producto);
-    setReemplazoInput(producto.numeroSerieReemplazo || '');
-    setValidationResult(null);
-    setDialogOpen(true);
-  };
-
-  const handleValidarReemplazo = async () => {
-    if (!selectedProduct || !reemplazoInput.trim()) {
-      setError('Ingrese un número de serie para validar');
-      return;
-    }
-
-    setValidating(true);
-    setValidationResult(null);
-
+  const asignarReemplazosYContinuar = async (codigo: string, response: BuscarReclamoResponse) => {
+    setAsignandoAutomatico(true);
     try {
-      const response = await entregaService.validarReemplazo(
-        selectedProduct.reclamoProductoSnId,
-        reemplazoInput
-      );
+      // Llamar al endpoint de asignación automática
+      const resultado = await entregaService.asignarReemplazosAutomatico(codigo);
+      if (!resultado.exito) {
+        throw new Error('No se pudieron asignar los reemplazos automáticamente.');
+      }
 
-      setValidationResult(response);
+      // Recargar el reclamo para obtener los reemplazos asignados
+      const responseActualizada = await entregaService.buscarReclamo(codigo);
+      setReclamo(responseActualizada);
+      setActiveStep(1);
+      setSuccess('Reclamo encontrado y reemplazos asignados automáticamente.');
 
-      if (response.valido) {
-        setSuccess('Producto válido. Ahora puede asignarlo.');
-      } else {
-        setError(response.mensaje);
+      // Verificar si todos los productos ya tienen reemplazo
+      const todosTienenReemplazo = responseActualizada.productos.every(p => p.reemplazoValido);
+      if (todosTienenReemplazo) {
+        // Podríamos avanzar automáticamente al paso 2, pero dejamos que el usuario vea la info
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error al validar el reemplazo');
+      setError(err.message || 'Error al asignar reemplazos automáticamente. Verifique el stock disponible.');
+      setReclamo(response); // Mostrar el reclamo sin reemplazos
+      setActiveStep(1); // Aún así mostramos el paso para que vea el error
     } finally {
-      setValidating(false);
-    }
-  };
-
-  const handleAsignarReemplazo = async () => {
-    if (!selectedProduct || !reemplazoInput.trim() || !validationResult?.valido) {
-      setError('Primero debe validar un producto válido');
-      return;
-    }
-
-    setAsignando(true);
-    try {
-      await entregaService.seleccionarReemplazo(
-        selectedProduct.reclamoProductoSnId,
-        reemplazoInput
-      );
-
-      // Actualizar la lista de productos
-      const response = await entregaService.buscarReclamo(codigoReclamo);
-      if (response.exito) {
-        setReclamo(response);
-        setSuccess('Reemplazo asignado exitosamente');
-        setDialogOpen(false);
-
-        // Verificar si todos los productos ya tienen reemplazo
-        const todosTienenReemplazo = response.productos.every(p => p.reemplazoValido);
-        if (todosTienenReemplazo) {
-          setActiveStep(2);
-        }
-      } else {
-        setError(response.mensaje);
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error al asignar el reemplazo');
-    } finally {
-      setAsignando(false);
+      setAsignandoAutomatico(false);
     }
   };
 
@@ -375,7 +300,7 @@ const EntregaDashboard: React.FC = () => {
                     value={codigoReclamo}
                     onChange={(e) => setCodigoReclamo(e.target.value)}
                     fullWidth
-                    disabled={loading}
+                    disabled={loading || asignandoAutomatico}
                     placeholder="Ej: REC-ENTREGA-001"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
@@ -388,11 +313,11 @@ const EntregaDashboard: React.FC = () => {
                   <Button
                     variant="contained"
                     onClick={handleBuscarReclamo}
-                    disabled={loading || !codigoReclamo.trim()}
+                    disabled={loading || asignandoAutomatico || !codigoReclamo.trim()}
                     fullWidth
                     startIcon={<Search />}
                   >
-                    {loading ? 'Buscando...' : 'Buscar Reclamo'}
+                    {loading || asignandoAutomatico ? 'Procesando...' : 'Buscar Reclamo'}
                   </Button>
                 </Grid>
               </Grid>
@@ -432,6 +357,7 @@ const EntregaDashboard: React.FC = () => {
                                 variant="outlined"
                                 size="small"
                                 onClick={() => handleSeleccionarReclamoPendiente(r.codigoReclamo)}
+                                disabled={loading || asignandoAutomatico}
                               >
                                 Seleccionar
                               </Button>
@@ -448,12 +374,10 @@ const EntregaDashboard: React.FC = () => {
         );
       case 1:
         return (
-          // ... (código existente sin cambios para el paso 1)
           <Box>
             <Typography variant="body1" paragraph>
-              Asigne un producto de reemplazo para cada producto defectuoso.
-              El producto de reemplazo debe ser de la misma marca y modelo,
-              y estar en estado "Se_Puede_Vender".
+              Los siguientes productos han sido aprobados para reemplazo. El sistema ha asignado automáticamente
+              productos de reemplazo del inventario disponible (misma marca y modelo). Verifique la información.
             </Typography>
 
             {reclamo && !reclamo.todosProductosRevisados && (
@@ -467,16 +391,21 @@ const EntregaDashboard: React.FC = () => {
               </Alert>
             )}
 
+            {asignandoAutomatico && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                <CircularProgress />
+                <Typography sx={{ ml: 2 }}>Asignando reemplazos automáticamente...</Typography>
+              </Box>
+            )}
+
             <TableContainer component={Paper}>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>Producto Defectuoso</TableCell>
                     <TableCell>Marca/Modelo</TableCell>
-                    <TableCell>Estado</TableCell>
                     <TableCell>Reemplazo Asignado</TableCell>
-                    <TableCell>Validación</TableCell>
-                    <TableCell>Acciones</TableCell>
+                    <TableCell>Estado</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -494,14 +423,6 @@ const EntregaDashboard: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={producto.estado}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
                         {producto.numeroSerieReemplazo ? (
                           <Chip
                             label={producto.numeroSerieReemplazo}
@@ -514,28 +435,14 @@ const EntregaDashboard: React.FC = () => {
                             label="Sin asignar"
                             size="small"
                             color="error"
-                            icon={<Error />}
+                            icon={<ErrorIcon />}
                           />
                         )}
                       </TableCell>
                       <TableCell>
-                        <Typography
-                          variant="caption"
-                          color={producto.reemplazoValido ? "success.main" : "warning.main"}
-                        >
-                          {producto.mensajeValidacion}
+                        <Typography variant="caption" color={producto.reemplazoValido ? "success.main" : "error.main"}>
+                          {producto.mensajeValidacion || (producto.reemplazoValido ? "Asignado" : "Pendiente")}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip title="Asignar reemplazo">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpenDialog(producto)}
-                            color={producto.reemplazoValido ? "success" : "primary"}
-                          >
-                            {producto.reemplazoValido ? <Edit /> : <Assignment />}
-                          </IconButton>
-                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -547,20 +454,14 @@ const EntregaDashboard: React.FC = () => {
               <Button
                 variant="outlined"
                 onClick={() => setActiveStep(0)}
+                disabled={asignandoAutomatico}
               >
                 Volver
               </Button>
               <Button
                 variant="contained"
-                onClick={() => {
-                  const todosTienenReemplazo = reclamo?.productos.every((p: { reemplazoValido: any; }) => p.reemplazoValido);
-                  if (todosTienenReemplazo) {
-                    setActiveStep(2);
-                  } else {
-                    setError('Todos los productos deben tener un reemplazo asignado');
-                  }
-                }}
-                disabled={!reclamo?.productos.every((p: { reemplazoValido: any; }) => p.reemplazoValido)}
+                onClick={() => setActiveStep(2)}
+                disabled={asignandoAutomatico || !reclamo?.productos.every(p => p.reemplazoValido)}
               >
                 Continuar
               </Button>
@@ -569,7 +470,6 @@ const EntregaDashboard: React.FC = () => {
         );
       case 2:
         return (
-          // ... (código existente sin cambios para el paso 2)
           <Box>
             <Typography variant="body1" paragraph>
               Genere el comprobante de entrega que será firmado por el cliente.
@@ -640,7 +540,6 @@ const EntregaDashboard: React.FC = () => {
         );
       case 3:
         return (
-          // ... (código existente sin cambios para el paso 3)
           <Box>
             <Typography variant="body1" paragraph>
               Suba el comprobante firmado por el cliente.
@@ -702,7 +601,6 @@ const EntregaDashboard: React.FC = () => {
         );
       case 4:
         return (
-          // ... (código existente sin cambios para el paso 4)
           <Box>
             <Typography variant="body1" paragraph>
               Confirme la entrega de los productos. Esta acción cambiará el estado
@@ -785,76 +683,6 @@ const EntregaDashboard: React.FC = () => {
           {success}
         </Alert>
       )}
-
-      {/* Dialog para asignar reemplazo */}
-      <Dialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Asignar Producto de Reemplazo
-        </DialogTitle>
-        <DialogContent>
-          {selectedProduct && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Producto Defectuoso
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {selectedProduct.marca} {selectedProduct.modelo} - {selectedProduct.numeroSerieProductoDefectuoso}
-              </Typography>
-
-              <TextField
-                label="Número de Serie del Reemplazo"
-                value={reemplazoInput}
-                onChange={(e) => setReemplazoInput(e.target.value)}
-                fullWidth
-                sx={{ mt: 3 }}
-                disabled={validating}
-                placeholder="Ej: SM-S911BZKD-REP01"
-              />
-
-              {validationResult && (
-                <Alert
-                  severity={validationResult.valido ? "success" : "error"}
-                  sx={{ mt: 2 }}
-                >
-                  {validationResult.mensaje}
-                  {validationResult.valido && validationResult.productoReemplazo && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      Marca: {validationResult.productoReemplazo.marca}<br />
-                      Modelo: {validationResult.productoReemplazo.modelo}<br />
-                      Estado: {validationResult.productoReemplazo.estadoInventario}
-                    </Typography>
-                  )}
-                </Alert>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleValidarReemplazo}
-            disabled={validating || !reemplazoInput.trim()}
-            startIcon={validating ? <CircularProgress size={20} /> : <Check />}
-          >
-            {validating ? 'Validando...' : 'Validar'}
-          </Button>
-          <Button
-            onClick={handleAsignarReemplazo}
-            disabled={!validationResult?.valido || asignando}
-            startIcon={asignando ? <CircularProgress size={20} /> : <Assignment />}
-            color="success"
-          >
-            {asignando ? 'Asignando...' : 'Asignar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
