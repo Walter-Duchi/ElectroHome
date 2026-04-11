@@ -1,4 +1,3 @@
-
 export interface ProductoEntregaDTO {
     reclamoProductoSnId: number;
     numeroSerieProductoDefectuoso: string;
@@ -53,4 +52,13 @@ export interface ComprobanteEntregaDTO {
     personalEntrega: string;
     productos: ProductoEntregaComprobanteDTO[];
     firmaBase64: string;
+}
+
+export interface ReclamoPendienteEntregaDTO {
+    id: number;
+    codigoReclamo: string;
+    cliente: string;
+    ruc: string;
+    fechaCreacion: string;
+    cantidadProductosPendientes: number;
 }

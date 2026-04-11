@@ -29,6 +29,8 @@ import {
   StepContent,
   CircularProgress,
   Snackbar,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Search,
@@ -45,7 +47,7 @@ import {
   Visibility,
 } from '@mui/icons-material';
 import { entregaService } from '../../services/entregaService';
-import { type BuscarReclamoResponse, type ProductoEntregaDTO } from '../../src/types/entrega';
+import { type BuscarReclamoResponse, type ProductoEntregaDTO, type ReclamoPendienteEntregaDTO } from '../../src/types/entrega';
 
 const EntregaDashboard: React.FC = () => {
   const [codigoReclamo, setCodigoReclamo] = useState('');
@@ -66,7 +68,9 @@ const EntregaDashboard: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [fileBase64, setFileBase64] = useState<string>('');
-
+  const [reclamosPendientes, setReclamosPendientes] = useState<ReclamoPendienteEntregaDTO[]>([]);
+  const [cargandoPendientes, setCargandoPendientes] = useState(false);
+  const [tabBusqueda, setTabBusqueda] = useState(0); // 0 = código, 1 = lista
 
   const steps = [
     'Buscar Reclamo',
@@ -75,6 +79,23 @@ const EntregaDashboard: React.FC = () => {
     'Subir Comprobante Firmado',
     'Confirmar Entrega'
   ];
+
+  // Cargar reclamos pendientes al montar el componente
+  useEffect(() => {
+    cargarReclamosPendientes();
+  }, []);
+
+  const cargarReclamosPendientes = async () => {
+    setCargandoPendientes(true);
+    try {
+      const pendientes = await entregaService.obtenerReclamosPendientes();
+      setReclamosPendientes(pendientes);
+    } catch (err: any) {
+      console.error('Error cargando reclamos pendientes:', err);
+    } finally {
+      setCargandoPendientes(false);
+    }
+  };
 
   const handleBuscarReclamo = async () => {
     if (!codigoReclamo.trim()) {
@@ -106,6 +127,45 @@ const EntregaDashboard: React.FC = () => {
         setSuccess('Reclamo encontrado exitosamente');
 
         // Verificar si todos los productos ya tienen reemplazo
+        const todosTienenReemplazo = response.productos.every(p => p.reemplazoValido);
+        if (todosTienenReemplazo) {
+          setActiveStep(2);
+        }
+      } else {
+        setError(response.mensaje);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al buscar el reclamo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSeleccionarReclamoPendiente = async (codigo: string) => {
+    setCodigoReclamo(codigo);
+    // Buscar automáticamente el reclamo seleccionado
+    setLoading(true);
+    setError(null);
+    setReclamo(null);
+    setActiveStep(0);
+    setPdfUrl(null);
+    setSelectedFile(null);
+    setFileBase64('');
+
+    try {
+      const response = await entregaService.buscarReclamo(codigo);
+
+      if (response.exito) {
+        if (!response.productos || response.productos.length === 0) {
+          setError('No hay productos para entregar en este reclamo.');
+          setReclamo(response);
+          return;
+        }
+
+        setReclamo(response);
+        setActiveStep(1);
+        setSuccess('Reclamo encontrado exitosamente');
+
         const todosTienenReemplazo = response.productos.every(p => p.reemplazoValido);
         if (todosTienenReemplazo) {
           setActiveStep(2);
@@ -283,6 +343,8 @@ const EntregaDashboard: React.FC = () => {
         setPdfUrl(null);
         setSelectedFile(null);
         setFileBase64('');
+        // Recargar lista de pendientes
+        cargarReclamosPendientes();
       }, 2000);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al confirmar la entrega');
@@ -297,40 +359,96 @@ const EntregaDashboard: React.FC = () => {
         return (
           <Box>
             <Typography variant="body1" paragraph>
-              Ingrese el código del reclamo que desea procesar para entrega.
+              Seleccione un reclamo pendiente de la lista o ingrese el código manualmente.
             </Typography>
-            <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 8 }}>
-                <TextField
-                  label="Código de Reclamo"
-                  value={codigoReclamo}
-                  onChange={(e) => setCodigoReclamo(e.target.value)}
-                  fullWidth
-                  disabled={loading}
-                  placeholder="Ej: REC-ENTREGA-001"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleBuscarReclamo();
-                    }
-                  }}
-                />
+
+            <Tabs value={tabBusqueda} onChange={(_, newValue) => setTabBusqueda(newValue)} sx={{ mb: 2 }}>
+              <Tab label="Ingresar Código" />
+              <Tab label="Reclamos Pendientes" />
+            </Tabs>
+
+            {tabBusqueda === 0 && (
+              <Grid container spacing={2} alignItems="center">
+                <Grid size={{ xs: 12, sm: 8 }}>
+                  <TextField
+                    label="Código de Reclamo"
+                    value={codigoReclamo}
+                    onChange={(e) => setCodigoReclamo(e.target.value)}
+                    fullWidth
+                    disabled={loading}
+                    placeholder="Ej: REC-ENTREGA-001"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleBuscarReclamo();
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleBuscarReclamo}
+                    disabled={loading || !codigoReclamo.trim()}
+                    fullWidth
+                    startIcon={<Search />}
+                  >
+                    {loading ? 'Buscando...' : 'Buscar Reclamo'}
+                  </Button>
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <Button
-                  variant="contained"
-                  onClick={handleBuscarReclamo}
-                  disabled={loading || !codigoReclamo.trim()}
-                  fullWidth
-                  startIcon={<Search />}
-                >
-                  {loading ? 'Buscando...' : 'Buscar Reclamo'}
-                </Button>
-              </Grid>
-            </Grid>
+            )}
+
+            {tabBusqueda === 1 && (
+              <Box>
+                {cargandoPendientes ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : reclamosPendientes.length === 0 ? (
+                  <Alert severity="info">No hay reclamos pendientes de entrega.</Alert>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Código</TableCell>
+                          <TableCell>Cliente</TableCell>
+                          <TableCell>RUC</TableCell>
+                          <TableCell>Fecha Creación</TableCell>
+                          <TableCell>Productos Pendientes</TableCell>
+                          <TableCell>Acción</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {reclamosPendientes.map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell>{r.codigoReclamo}</TableCell>
+                            <TableCell>{r.cliente}</TableCell>
+                            <TableCell>{r.ruc}</TableCell>
+                            <TableCell>{new Date(r.fechaCreacion).toLocaleDateString('es-EC')}</TableCell>
+                            <TableCell>{r.cantidadProductosPendientes}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => handleSeleccionarReclamoPendiente(r.codigoReclamo)}
+                              >
+                                Seleccionar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            )}
           </Box>
         );
       case 1:
         return (
+          // ... (código existente sin cambios para el paso 1)
           <Box>
             <Typography variant="body1" paragraph>
               Asigne un producto de reemplazo para cada producto defectuoso.
@@ -451,6 +569,7 @@ const EntregaDashboard: React.FC = () => {
         );
       case 2:
         return (
+          // ... (código existente sin cambios para el paso 2)
           <Box>
             <Typography variant="body1" paragraph>
               Genere el comprobante de entrega que será firmado por el cliente.
@@ -521,6 +640,7 @@ const EntregaDashboard: React.FC = () => {
         );
       case 3:
         return (
+          // ... (código existente sin cambios para el paso 3)
           <Box>
             <Typography variant="body1" paragraph>
               Suba el comprobante firmado por el cliente.
@@ -582,6 +702,7 @@ const EntregaDashboard: React.FC = () => {
         );
       case 4:
         return (
+          // ... (código existente sin cambios para el paso 4)
           <Box>
             <Typography variant="body1" paragraph>
               Confirme la entrega de los productos. Esta acción cambiará el estado

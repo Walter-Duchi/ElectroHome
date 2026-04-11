@@ -735,6 +735,22 @@ app.MapPost("/api/entrega/buscar-reclamo", [Authorize(Roles = "Personal de Entre
     }
 });
 
+app.MapGet("/api/entrega/reclamos-pendientes", [Authorize(Roles = "Personal de Entrega")] async (IEntregaService entregaService, HttpContext httpContext) =>
+{
+    var logger = httpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        logger.LogInformation("Obteniendo reclamos pendientes para entrega");
+        var reclamos = await entregaService.ObtenerReclamosPendientesEntregaAsync();
+        return Results.Ok(reclamos);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error al obtener reclamos pendientes");
+        return Results.Problem($"Error interno: {ex.Message}");
+    }
+});
+
 app.MapPost("/api/entrega/validar-reemplazo", [Authorize(Roles = "Personal de Entrega")] async (
     ValidarReemplazoRequest request,
     IEntregaService entregaService,

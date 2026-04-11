@@ -29,6 +29,41 @@ namespace Infrastructure.Reclamos.Services
             }
         }
 
+        public async Task<List<ReclamoPendienteEntregaDTO>> ObtenerReclamosPendientesEntregaAsync()
+        {
+            _logger.LogInformation("Obteniendo reclamos pendientes de entrega...");
+
+            var reclamosPendientes = await _context.Reclamos
+                .Include(r => r.FkEmpresaClienteNavigation)
+                .Include(r => r.ReclamosProductoSns)
+                    .ThenInclude(rps => rps.ComprobanteProductoReemplazado)
+                        .ThenInclude(cpr => cpr.FkComprobanteDeReemplazoNavigation)
+                .Where(r => r.ReclamosProductoSns.Any(rps =>
+                    rps.Estado == "Aprobado" &&
+                    rps.FormaCompensacion == "Reemplazo" &&
+                    (rps.ComprobanteProductoReemplazado == null ||
+                     rps.ComprobanteProductoReemplazado.FkComprobanteDeReemplazoNavigation.Estado != "Completado")))
+                .Select(r => new ReclamoPendienteEntregaDTO
+                {
+                    Id = r.Id,
+                    CodigoReclamo = r.CodigoReclamo,
+                    Cliente = r.FkEmpresaClienteNavigation.Nombres + " " + r.FkEmpresaClienteNavigation.Apellidos,
+                    Ruc = r.FkEmpresaClienteNavigation.Ruc,
+                    FechaCreacion = r.FechaCreacionReclamo ?? DateTime.MinValue,
+                    CantidadProductosPendientes = r.ReclamosProductoSns.Count(rps =>
+                        rps.Estado == "Aprobado" &&
+                        rps.FormaCompensacion == "Reemplazo" &&
+                        (rps.ComprobanteProductoReemplazado == null ||
+                         rps.ComprobanteProductoReemplazado.FkComprobanteDeReemplazoNavigation.Estado != "Completado"))
+                })
+                .Where(r => r.CantidadProductosPendientes > 0)
+                .OrderByDescending(r => r.FechaCreacion)
+                .ToListAsync();
+
+            _logger.LogInformation("Se encontraron {Count} reclamos pendientes de entrega.", reclamosPendientes.Count);
+            return reclamosPendientes;
+        }
+
         public async Task<BuscarReclamoResponse> BuscarReclamoAsync(string codigoReclamo)
         {
             try

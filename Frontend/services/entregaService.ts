@@ -3,9 +3,16 @@ import {
     type BuscarReclamoResponse,
     type ValidarReemplazoResponse,
     type ComprobanteEntregaDTO,
+    type ReclamoPendienteEntregaDTO,
 } from '../src/types/entrega';
 
 export const entregaService = {
+    // Obtener reclamos pendientes de entrega
+    obtenerReclamosPendientes: async (): Promise<ReclamoPendienteEntregaDTO[]> => {
+        const response = await api.get('/entrega/reclamos-pendientes');
+        return response.data;
+    },
+
     // Buscar reclamo por código
     buscarReclamo: async (codigoReclamo: string): Promise<BuscarReclamoResponse> => {
         const response = await api.post('/entrega/buscar-reclamo', { codigoReclamo });
